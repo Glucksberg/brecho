@@ -1,0 +1,7 @@
+# Ignore de Node.js
+node_modules/
+dist/
+.env
+*.log
+.cache/
+.DS_Store
