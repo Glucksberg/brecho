@@ -31,6 +31,12 @@ import Despesas from '../Pages/Despesas.jsx'
 import Relatorios from '../Pages/Relatorios.jsx'
 import Configuracoes from '../Pages/Configuracoes.jsx'
 
+// Página de teste
+import TestComponents from '../Pages/TestComponents.jsx'
+import TestNavbar from '../Pages/TestNavbar.jsx'
+import TestHero from '../Pages/TestHero.jsx'
+import TestCategory from '../Pages/TestCategory.jsx'
+
 function App() {
   return (
     <Router>
@@ -64,6 +70,12 @@ function App() {
         <Route path="/Despesas" element={<Layout currentPageName="Despesas"><Despesas /></Layout>} />
         <Route path="/Relatorios" element={<Layout currentPageName="Relatorios"><Relatorios /></Layout>} />
         <Route path="/Configuracoes" element={<Layout currentPageName="Configuracoes"><Configuracoes /></Layout>} />
+
+        {/* Páginas de teste dos componentes */}
+        <Route path="/test" element={<TestComponents />} />
+        <Route path="/test-navbar" element={<TestNavbar />} />
+        <Route path="/test-hero" element={<TestHero />} />
+        <Route path="/test-category" element={<TestCategory />} />
 
         {/* Rota 404 - redireciona para home */}
         <Route path="*" element={<Layout currentPageName="Home"><Home /></Layout>} />

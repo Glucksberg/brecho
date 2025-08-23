@@ -11,7 +11,7 @@ export default defineConfig({
     }
   },
   server: {
-    port: 3000,
+    port: 5173,
     host: true
   },
   build: {
@@ -29,7 +29,7 @@ export default defineConfig({
     }
   },
   preview: {
-    port: 3000,
+    port: 5173,
     host: true
   }
 }) 

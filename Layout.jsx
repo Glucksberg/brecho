@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { createPageUrl } from "@/utils";
@@ -8,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CartProvider, useCart } from "@/components/providers/CartContext";
 import { FavoritesProvider } from "@/components/providers/FavoritesContext";
+import Navbar from "@/components/ui/Navbar";
 import {
   Sidebar,
   SidebarContent,
@@ -103,7 +103,6 @@ function AppLayout({ children, currentPageName }) {
   const location = useLocation();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     checkAuth();
@@ -320,119 +319,11 @@ function AppLayout({ children, currentPageName }) {
         `}
       </style>
       
-      {/* Header público */}
-      <header className="bg-white/90 backdrop-blur-md border-b border-purple-100 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <Link to={createPageUrl('Home')} className="flex items-center gap-3">
-              <img 
-                src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/c3cbe9394_mandala.jpg" 
-                alt="Brechó da Luli" 
-                className="w-10 h-10 rounded-full object-cover shadow-sm"
-              />
-              <span className="font-bold text-xl text-gray-900">Brechó da Luli</span>
-            </Link>
-
-            {/* Desktop Navigation */}
-            <nav className="hidden md:flex items-center space-x-8">
-              {publicPages.map((item) => (
-                <Link
-                  key={item.title}
-                  to={item.url}
-                  className={`font-medium transition-colors ${
-                    location.pathname === item.url
-                      ? 'text-purple-600'
-                      : 'text-gray-600 hover:text-purple-600'
-                  }`}
-                >
-                  {item.title}
-                </Link>
-              ))}
-              
-              <div className="flex items-center gap-4">
-                <CartIcon />
-                {user ? (
-                  <UserAvatarDropdown user={user} handleLogout={handleLogout} />
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <Link to={createPageUrl('Entrar')}>
-                      <Button variant="outline" className="text-sm">
-                        Entrar
-                      </Button>
-                    </Link>
-                    <Link to={createPageUrl('Cadastro')}>
-                      <Button className="bg-gradient-to-r from-purple-600 to-blue-600 text-white text-sm">
-                        <UserCheck className="w-4 h-4 mr-2" />
-                        Cadastrar
-                      </Button>
-                    </Link>
-                  </div>
-                )}
-              </div>
-            </nav>
-
-            {/* Mobile menu button */}
-            <div className="md:hidden flex items-center gap-2">
-              <CartIcon />
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              >
-                {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-              </Button>
-            </div>
-          </div>
-
-          {/* Mobile Navigation */}
-          {isMobileMenuOpen && (
-            <div className="md:hidden py-4 border-t border-purple-100">
-              <div className="flex flex-col space-y-3">
-                {publicPages.map((item) => (
-                  <Link
-                    key={item.title}
-                    to={item.url}
-                    className={`font-medium px-3 py-2 rounded-lg transition-colors ${
-                      location.pathname === item.url
-                        ? 'text-purple-600 bg-purple-50'
-                        : 'text-gray-600 hover:text-purple-600 hover:bg-purple-50'
-                    }`}
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    {item.title}
-                  </Link>
-                ))}
-                
-                {user ? (
-                  <div className="pt-3 border-t border-purple-100">
-                    <div className="px-3 mb-3 flex items-center gap-3">
-                      <UserAvatarDropdown user={user} handleLogout={() => { handleLogout(); setIsMobileMenuOpen(false); }} />
-                       <div>
-                          <p className="font-semibold truncate">{user.full_name}</p>
-                          <p className="text-xs text-gray-500 font-normal truncate">{user.email}</p>
-                       </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="pt-3 border-t border-purple-100 space-y-2">
-                    <Link to={createPageUrl('Entrar')} className="w-full block">
-                      <Button variant="outline" className="w-full">
-                        Entrar
-                      </Button>
-                    </Link>
-                    <Link to={createPageUrl('Cadastro')} onClick={() => setIsMobileMenuOpen(false)}>
-                      <Button className="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white">
-                        <UserCheck className="w-4 h-4 mr-2" />
-                        Cadastrar
-                      </Button>
-                    </Link>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-      </header>
+      {/* Navbar do Brechó da Luli */}
+      <Navbar
+        currentUser={user}
+        onLogout={handleLogout}
+      />
 
       <main>{children}</main>
 
