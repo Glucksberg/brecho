@@ -10,6 +10,7 @@ export class Venda {
     this.total = data.total || 0;
     this.formaPagamento = data.formaPagamento || ''; // 'dinheiro' | 'cartao' | 'pix' | 'transferencia'
     this.status = data.status || 'pendente'; // 'pendente' | 'pago' | 'cancelado' | 'estornado'
+    this.origem = data.origem || 'presencial'; // 'presencial' | 'online'
     this.observacoes = data.observacoes || '';
     this.dataVenda = data.dataVenda || new Date();
     this.dataPagamento = data.dataPagamento || null;
@@ -19,6 +20,10 @@ export class Venda {
     this.cupomDesconto = data.cupomDesconto || null;
     this.taxaEntrega = data.taxaEntrega || 0;
     this.enderecoEntrega = data.enderecoEntrega || null;
+
+    // Para multi-tenant futuro
+    this.brechoId = data.brechoId || null;
+
     this.dataCriacao = data.dataCriacao || new Date();
     this.dataAtualizacao = data.dataAtualizacao || new Date();
   }
@@ -42,6 +47,14 @@ export class Venda {
 
   isCancelado() {
     return this.status === 'cancelado';
+  }
+
+  isOnline() {
+    return this.origem === 'online';
+  }
+
+  isPresencial() {
+    return this.origem === 'presencial';
   }
 
   // Métodos utilitários
@@ -150,6 +163,10 @@ export class Venda {
     return formasMap[this.formaPagamento] || this.formaPagamento;
   }
 
+  getOrigemDisplay() {
+    return this.origem === 'online' ? 'Online' : 'Presencial';
+  }
+
   gerarNumeroVenda() {
     const agora = new Date();
     const ano = agora.getFullYear();
@@ -179,9 +196,11 @@ export class Venda {
       vendedorId: this.vendedorId,
       vendedor: this.vendedor,
       numeroVenda: this.numeroVenda,
+      origem: this.origem,
       cupomDesconto: this.cupomDesconto,
       taxaEntrega: this.taxaEntrega,
       enderecoEntrega: this.enderecoEntrega,
+      brechoId: this.brechoId,
       dataCriacao: this.dataCriacao,
       dataAtualizacao: this.dataAtualizacao
     };

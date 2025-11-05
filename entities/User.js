@@ -14,8 +14,23 @@ export class User {
       estado: '',
       cep: ''
     };
-    this.tipo = data.tipo || 'cliente'; // 'cliente' | 'admin'
+    this.tipo = data.tipo || 'cliente'; // 'cliente' | 'admin' | 'dono' | 'vendedor' | 'fornecedor'
     this.avatar = data.avatar || '';
+
+    // Para multi-tenant futuro
+    this.brechoId = data.brechoId || null;
+
+    // Para vendedores
+    this.comissao = data.comissao || 0; // Percentual de comissão
+    this.totalVendasRealizadas = data.totalVendasRealizadas || 0;
+    this.metaMensal = data.metaMensal || 0;
+
+    // Para fornecedores (link com a entidade Fornecedora)
+    this.fornecedoraId = data.fornecedoraId || null;
+
+    // Permissões e controle
+    this.permissoes = data.permissoes || [];
+
     this.dataCriacao = data.dataCriacao || new Date();
     this.dataAtualizacao = data.dataAtualizacao || new Date();
     this.ativo = data.ativo !== undefined ? data.ativo : true;
@@ -38,6 +53,38 @@ export class User {
 
   isAdmin() {
     return this.tipo === 'admin';
+  }
+
+  isDono() {
+    return this.tipo === 'dono';
+  }
+
+  isVendedor() {
+    return this.tipo === 'vendedor';
+  }
+
+  isFornecedor() {
+    return this.tipo === 'fornecedor';
+  }
+
+  isCliente() {
+    return this.tipo === 'cliente';
+  }
+
+  // Verifica se tem acesso administrativo
+  hasAdminAccess() {
+    return this.tipo === 'admin' || this.tipo === 'dono';
+  }
+
+  // Verifica se pode vender
+  canSell() {
+    return ['admin', 'dono', 'vendedor'].includes(this.tipo);
+  }
+
+  // Verifica permissão específica
+  hasPermission(permission) {
+    if (this.isAdmin()) return true; // Admin tem todas as permissões
+    return this.permissoes.includes(permission);
   }
 
   // Métodos utilitários
@@ -63,6 +110,41 @@ export class User {
     return endereco;
   }
 
+  getTipoDisplay() {
+    const tipoMap = {
+      'cliente': 'Cliente',
+      'admin': 'Administrador',
+      'dono': 'Proprietário',
+      'vendedor': 'Vendedor(a)',
+      'fornecedor': 'Fornecedor(a)'
+    };
+    return tipoMap[this.tipo] || this.tipo;
+  }
+
+  // Para vendedores
+  getFormattedComissao() {
+    return `${this.comissao}%`;
+  }
+
+  getFormattedTotalVendas() {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    }).format(this.totalVendasRealizadas);
+  }
+
+  getFormattedMeta() {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    }).format(this.metaMensal);
+  }
+
+  getPercentualMeta() {
+    if (this.metaMensal === 0) return 0;
+    return (this.totalVendasRealizadas / this.metaMensal) * 100;
+  }
+
   // Serialização
   toJSON() {
     return {
@@ -73,6 +155,12 @@ export class User {
       endereco: this.endereco,
       tipo: this.tipo,
       avatar: this.avatar,
+      brechoId: this.brechoId,
+      comissao: this.comissao,
+      totalVendasRealizadas: this.totalVendasRealizadas,
+      metaMensal: this.metaMensal,
+      fornecedoraId: this.fornecedoraId,
+      permissoes: this.permissoes,
       dataCriacao: this.dataCriacao,
       dataAtualizacao: this.dataAtualizacao,
       ativo: this.ativo

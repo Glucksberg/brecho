@@ -19,6 +19,17 @@ export class Produto {
     this.ativo = data.ativo !== undefined ? data.ativo : true;
     this.destaque = data.destaque || false;
     this.tags = data.tags || [];
+
+    // Consignação
+    this.tipo = data.tipo || 'proprio'; // 'proprio' | 'consignado'
+    this.fornecedoraId = data.fornecedoraId || null;
+    this.fornecedora = data.fornecedora || null; // Objeto Fornecedora
+
+    // Código de barras
+    this.codigoBarras = data.codigoBarras || '';
+    this.sku = data.sku || ''; // SKU interno
+
+    // Controle
     this.dataCriacao = data.dataCriacao || new Date();
     this.dataAtualizacao = data.dataAtualizacao || new Date();
     this.vendido = data.vendido || false;
@@ -29,6 +40,9 @@ export class Produto {
       largura: 0,
       profundidade: 0
     };
+
+    // Para multi-tenant futuro
+    this.brechoId = data.brechoId || null;
   }
 
   // Métodos de validação
@@ -51,6 +65,14 @@ export class Produto {
 
   isSale() {
     return this.precoOriginal && this.precoOriginal > this.preco;
+  }
+
+  isConsignado() {
+    return this.tipo === 'consignado' && this.fornecedoraId !== null;
+  }
+
+  isProprio() {
+    return this.tipo === 'proprio';
   }
 
   // Métodos utilitários
@@ -102,6 +124,35 @@ export class Produto {
       return `${this.categoria} > ${this.subcategoria}`;
     }
     return this.categoria;
+  }
+
+  getTipoDisplay() {
+    return this.tipo === 'proprio' ? 'Próprio' : 'Consignado';
+  }
+
+  getFornecedoraNome() {
+    if (this.fornecedora) {
+      return this.fornecedora.nome;
+    }
+    return '-';
+  }
+
+  // Gerar código de barras aleatório (EAN-13 simplificado)
+  gerarCodigoBarras() {
+    if (this.codigoBarras) return this.codigoBarras;
+
+    // Gera 12 dígitos aleatórios + 1 dígito verificador
+    const codigo = Array.from({ length: 12 }, () => Math.floor(Math.random() * 10)).join('');
+
+    // Cálculo simples do dígito verificador (EAN-13)
+    let soma = 0;
+    for (let i = 0; i < 12; i++) {
+      soma += parseInt(codigo[i]) * (i % 2 === 0 ? 1 : 3);
+    }
+    const digitoVerificador = (10 - (soma % 10)) % 10;
+
+    this.codigoBarras = codigo + digitoVerificador;
+    return this.codigoBarras;
   }
 
   // Busca e filtros
@@ -186,12 +237,18 @@ export class Produto {
       ativo: this.ativo,
       destaque: this.destaque,
       tags: this.tags,
+      tipo: this.tipo,
+      fornecedoraId: this.fornecedoraId,
+      fornecedora: this.fornecedora,
+      codigoBarras: this.codigoBarras,
+      sku: this.sku,
       dataCriacao: this.dataCriacao,
       dataAtualizacao: this.dataAtualizacao,
       vendido: this.vendido,
       dataVenda: this.dataVenda,
       peso: this.peso,
-      dimensoes: this.dimensoes
+      dimensoes: this.dimensoes,
+      brechoId: this.brechoId
     };
   }
 
