@@ -13,12 +13,20 @@
     "@radix-ui/react-slot": "^1.0.2",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.0.0",
+    "date-fns": "^4.1.0",
     "framer-motion": "^10.16.16",
+    "jsbarcode": "^3.12.1",
+    "jspdf": "^3.0.3",
     "lucide-react": "^0.298.0",
+    "qrcode.react": "^4.2.0",
     "react": "^18.2.0",
+    "react-barcode": "^1.6.1",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.20.1",
-    "tailwind-merge": "^2.1.0"
+    "react-to-print": "^3.2.0",
+    "tailwind-merge": "^2.1.0",
+    "xlsx": "^0.18.5",
+    "zod": "^4.1.12"
   },
   "devDependencies": {
     "@types/react": "^18.2.43",
@@ -33,4 +41,4 @@
     "tailwindcss": "^3.3.6",
     "vite": "^5.0.8"
   }
-} 
+}
