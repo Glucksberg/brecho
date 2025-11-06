@@ -5,10 +5,16 @@ import { LojaLayout } from '@/components/layout'
 import { Card, CardContent, Button, Badge } from '@/components/ui'
 import { Heart, Share2, ShoppingCart, Truck, RefreshCcw, ShieldCheck } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
+import { useCart } from '@/contexts/CartContext'
+import { useFavorites } from '@/contexts/FavoritesContext'
+import { useRouter } from 'next/navigation'
 
 export default function ProdutoDetalhePage({ params }: { params: { id: string } }) {
+  const router = useRouter()
   const [selectedImage, setSelectedImage] = useState(0)
   const [quantity, setQuantity] = useState(1)
+  const { addToCart } = useCart()
+  const { toggleFavorite, isFavorite } = useFavorites()
 
   // Mock product data
   const produto = {
@@ -50,6 +56,56 @@ export default function ProdutoDetalhePage({ params }: { params: { id: string } 
   }
 
   const condicao = getCondicaoBadge(produto.condicao)
+
+  const handleAddToCart = () => {
+    for (let i = 0; i < quantity; i++) {
+      addToCart({
+        id: produto.id,
+        nome: produto.nome,
+        preco: produto.preco,
+        imagemPrincipal: produto.imagens[0],
+        tamanho: produto.tamanho,
+        cor: produto.cor,
+        marca: produto.marca,
+        categoria: produto.categoria
+      })
+    }
+    // Show success message or redirect to cart
+    const goToCart = window.confirm('Produto adicionado ao carrinho! Deseja ir para o carrinho?')
+    if (goToCart) {
+      router.push('/loja/carrinho')
+    }
+  }
+
+  const handleToggleFavorite = () => {
+    toggleFavorite({
+      id: produto.id,
+      nome: produto.nome,
+      preco: produto.preco,
+      imagemPrincipal: produto.imagens[0],
+      tamanho: produto.tamanho,
+      cor: produto.cor,
+      marca: produto.marca,
+      categoria: produto.categoria,
+      descricao: produto.descricao
+    })
+  }
+
+  const handleShare = () => {
+    if (navigator.share) {
+      navigator.share({
+        title: produto.nome,
+        text: produto.descricao,
+        url: window.location.href
+      })
+    } else {
+      // Fallback: copy to clipboard
+      navigator.clipboard.writeText(window.location.href)
+      alert('Link copiado para a área de transferência!')
+    }
+  }
+
+  const isProductFavorite = isFavorite(produto.id)
 
   return (
     <LojaLayout>
@@ -171,12 +227,28 @@ export default function ProdutoDetalhePage({ params }: { params: { id: string } 
 
             {/* Actions */}
             <div className="flex gap-3 mb-6">
-              <Button variant="primary" size="lg" className="flex-1" icon={<ShoppingCart className="w-5 h-5" />}>
+              <Button
+                variant="primary"
+                size="lg"
+                className="flex-1"
+                icon={<ShoppingCart className="w-5 h-5" />}
+                onClick={handleAddToCart}
+              >
                 Adicionar ao Carrinho
               </Button>
-              <Button variant="outline" size="lg" icon={<Heart className="w-5 h-5" />}>
+              <Button
+                variant={isProductFavorite ? "primary" : "outline"}
+                size="lg"
+                icon={<Heart className={`w-5 h-5 ${isProductFavorite ? 'fill-current' : ''}`} />}
+                onClick={handleToggleFavorite}
+              >
               </Button>
-              <Button variant="outline" size="lg" icon={<Share2 className="w-5 h-5" />}>
+              <Button
+                variant="outline"
+                size="lg"
+                icon={<Share2 className="w-5 h-5" />}
+                onClick={handleShare}
+              >
               </Button>
             </div>
 

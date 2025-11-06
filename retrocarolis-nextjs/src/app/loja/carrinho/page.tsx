@@ -5,68 +5,24 @@ import { LojaLayout } from '@/components/layout'
 import { Card, CardHeader, CardTitle, CardContent, Button, Input } from '@/components/ui'
 import { Trash2, Plus, Minus, Tag, ShoppingBag } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
+import { useCart } from '@/contexts/CartContext'
 import Link from 'next/link'
 
 export default function CarrinhoPage() {
   const [cupom, setCupom] = useState('')
-
-  // Mock cart data
-  const [itens, setItens] = useState([
-    {
-      id: '1',
-      produtoId: 'p1',
-      nome: 'Vestido Floral Vintage',
-      preco: 189.90,
-      quantidade: 1,
-      imagem: '/placeholder-product.jpg',
-      tamanho: 'M',
-      cor: 'Floral Multicolorido'
-    },
-    {
-      id: '2',
-      produtoId: 'p2',
-      nome: 'Jaqueta Jeans Anos 90',
-      preco: 159.90,
-      quantidade: 1,
-      imagem: '/placeholder-product.jpg',
-      tamanho: 'G',
-      cor: 'Azul'
-    },
-    {
-      id: '3',
-      produtoId: 'p3',
-      nome: 'Bolsa de Couro Marrom',
-      preco: 129.90,
-      quantidade: 2,
-      imagem: '/placeholder-product.jpg',
-      tamanho: 'Único',
-      cor: 'Marrom'
-    },
-  ])
-
-  const updateQuantity = (id: string, delta: number) => {
-    setItens(itens.map(item =>
-      item.id === id
-        ? { ...item, quantidade: Math.max(1, item.quantidade + delta) }
-        : item
-    ))
-  }
-
-  const removeItem = (id: string) => {
-    setItens(itens.filter(item => item.id !== id))
-  }
+  const { items, cartTotal, updateQuantity, removeFromCart } = useCart()
 
   const aplicarCupom = () => {
     // TODO: Implement coupon validation
     console.log('Aplicar cupom:', cupom)
   }
 
-  const subtotal = itens.reduce((sum, item) => sum + (item.preco * item.quantidade), 0)
+  const subtotal = cartTotal
   const desconto = 0 // TODO: Calculate discount from coupon
   const frete = subtotal >= 200 ? 0 : 15.00
   const total = subtotal - desconto + frete
 
-  if (itens.length === 0) {
+  if (items.length === 0) {
     return (
       <LojaLayout>
         <div className="max-w-7xl mx-auto px-4 py-16">
@@ -103,27 +59,36 @@ export default function CarrinhoPage() {
           <div className="lg:col-span-2">
             <Card variant="bordered">
               <CardHeader>
-                <CardTitle>Itens ({itens.length})</CardTitle>
+                <CardTitle>Itens ({items.length})</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {itens.map((item) => (
+                  {items.map((item) => (
                     <div key={item.id} className="flex gap-4 pb-4 border-b border-gray-200 last:border-0">
                       {/* Image */}
                       <div className="w-24 h-24 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <span className="text-4xl">📷</span>
+                        {item.imagemPrincipal ? (
+                          <img
+                            src={item.imagemPrincipal}
+                            alt={item.nome}
+                            className="w-full h-full object-cover rounded-lg"
+                          />
+                        ) : (
+                          <span className="text-4xl">📷</span>
+                        )}
                       </div>
 
                       {/* Info */}
                       <div className="flex-1 min-w-0">
-                        <Link href={`/loja/produto/${item.produtoId}`}>
+                        <Link href={`/loja/produto/${item.id}`}>
                           <h3 className="font-semibold text-gray-900 hover:text-blue-600 transition-colors">
                             {item.nome}
                           </h3>
                         </Link>
                         <div className="text-sm text-gray-600 mt-1">
-                          <p>Tamanho: {item.tamanho}</p>
-                          <p>Cor: {item.cor}</p>
+                          {item.tamanho && <p>Tamanho: {item.tamanho}</p>}
+                          {item.cor && <p>Cor: {item.cor}</p>}
+                          {item.marca && <p>Marca: {item.marca}</p>}
                         </div>
                         <p className="font-bold text-blue-600 mt-2">
                           {formatCurrency(item.preco)}
@@ -133,7 +98,7 @@ export default function CarrinhoPage() {
                       {/* Quantity Controls */}
                       <div className="flex flex-col items-end gap-3">
                         <button
-                          onClick={() => removeItem(item.id)}
+                          onClick={() => removeFromCart(item.id)}
                           className="text-gray-400 hover:text-red-500 transition-colors"
                         >
                           <Trash2 className="w-5 h-5" />
@@ -141,14 +106,14 @@ export default function CarrinhoPage() {
 
                         <div className="flex items-center gap-2 border border-gray-300 rounded-lg">
                           <button
-                            onClick={() => updateQuantity(item.id, -1)}
+                            onClick={() => updateQuantity(item.id, item.quantity - 1)}
                             className="w-8 h-8 hover:bg-gray-100 flex items-center justify-center"
                           >
                             <Minus className="w-4 h-4" />
                           </button>
-                          <span className="w-8 text-center font-semibold">{item.quantidade}</span>
+                          <span className="w-8 text-center font-semibold">{item.quantity}</span>
                           <button
-                            onClick={() => updateQuantity(item.id, 1)}
+                            onClick={() => updateQuantity(item.id, item.quantity + 1)}
                             className="w-8 h-8 hover:bg-gray-100 flex items-center justify-center"
                           >
                             <Plus className="w-4 h-4" />
@@ -156,7 +121,7 @@ export default function CarrinhoPage() {
                         </div>
 
                         <p className="font-semibold text-gray-900">
-                          {formatCurrency(item.preco * item.quantidade)}
+                          {formatCurrency(item.preco * item.quantity)}
                         </p>
                       </div>
                     </div>

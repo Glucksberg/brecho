@@ -3,12 +3,16 @@
 import Link from 'next/link'
 import { ShoppingCart, User, Search, Heart } from 'lucide-react'
 import { Input } from '@/components/ui'
+import { useCart } from '@/contexts/CartContext'
+import { useFavorites } from '@/contexts/FavoritesContext'
 
 interface LojaLayoutProps {
   children: React.ReactNode
 }
 
 export function LojaLayout({ children }: LojaLayoutProps) {
+  const { cartCount } = useCart()
+  const { favoritesCount } = useFavorites()
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Header */}
@@ -51,12 +55,19 @@ export function LojaLayout({ children }: LojaLayoutProps) {
             <div className="flex items-center gap-4">
               <Link href="/loja/favoritos" className="p-2 hover:bg-gray-100 rounded-lg transition-colors relative">
                 <Heart className="w-6 h-6 text-gray-600" />
+                {favoritesCount > 0 && (
+                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-pink-500 text-white text-xs rounded-full flex items-center justify-center">
+                    {favoritesCount}
+                  </span>
+                )}
               </Link>
               <Link href="/loja/carrinho" className="p-2 hover:bg-gray-100 rounded-lg transition-colors relative">
                 <ShoppingCart className="w-6 h-6 text-gray-600" />
-                <span className="absolute -top-1 -right-1 w-5 h-5 bg-blue-600 text-white text-xs rounded-full flex items-center justify-center">
-                  3
-                </span>
+                {cartCount > 0 && (
+                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-blue-600 text-white text-xs rounded-full flex items-center justify-center">
+                    {cartCount}
+                  </span>
+                )}
               </Link>
               <Link href="/loja/conta" className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
                 <User className="w-6 h-6 text-gray-600" />
