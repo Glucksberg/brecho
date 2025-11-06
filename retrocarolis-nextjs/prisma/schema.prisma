@@ -66,6 +66,10 @@ model User {
   image         String?
   password      String? // Hashed
 
+  // Password reset
+  resetToken       String?   @unique
+  resetTokenExpiry DateTime?
+
   // Tipo e permissões
   role          UserRole  @default(CLIENTE)
   permissoes    String[] // Permissões customizadas
