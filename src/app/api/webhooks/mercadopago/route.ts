@@ -110,22 +110,61 @@ export async function POST(request: NextRequest) {
 async function handleApprovedPayment(paymentInfo: any) {
   console.log('💚 Payment APPROVED:', paymentInfo.id)
 
-  // TODO: Create sale in database
-  // const venda = await prisma.venda.create({
-  //   data: {
-  //     brechoId: 'BRECHO_ID',
-  //     clienteId: 'CLIENT_ID',
-  //     vendedorId: 'SELLER_ID',
-  //     tipoPagamento: mapPaymentMethod(paymentInfo.payment_method_id),
-  //     valorTotal: paymentInfo.transaction_amount,
-  //     origem: 'ONLINE',
-  //     status: 'CONFIRMADA',
-  //     mercadoPagoPaymentId: paymentInfo.id.toString(),
-  //     mercadoPagoStatus: paymentInfo.status
-  //   }
+  const paymentId = paymentInfo.id.toString()
+
+  // IDEMPOTENCY CHECK: Verify if this payment was already processed
+  const vendaExistente = await prisma.venda.findUnique({
+    where: { mercadoPagoPaymentId: paymentId }
+  })
+
+  if (vendaExistente) {
+    console.log('⚠️  Payment already processed:', paymentId)
+    console.log('   Existing sale ID:', vendaExistente.id)
+
+    // If status changed, update it
+    if (vendaExistente.mercadoPagoStatus !== paymentInfo.status) {
+      await prisma.venda.update({
+        where: { id: vendaExistente.id },
+        data: { mercadoPagoStatus: paymentInfo.status }
+      })
+      console.log('   Status updated to:', paymentInfo.status)
+    }
+
+    return // Don't process again
+  }
+
+  // TODO: Create sale in database using transaction
+  // IMPORTANT: Use prisma.$transaction to ensure atomicity
+  // const venda = await prisma.$transaction(async (tx) => {
+  //   // 1. Create venda
+  //   const novaVenda = await tx.venda.create({
+  //     data: {
+  //       brechoId: 'BRECHO_ID',
+  //       clienteId: 'CLIENT_ID',
+  //       vendedorId: 'SELLER_ID',
+  //       formaPagamento: mapPaymentMethod(paymentInfo.payment_method_id),
+  //       subtotal: paymentInfo.transaction_amount,
+  //       total: paymentInfo.transaction_amount,
+  //       origem: 'ONLINE',
+  //       status: 'PAGO',
+  //       mercadoPagoPaymentId: paymentId,
+  //       mercadoPagoStatus: paymentInfo.status,
+  //       mercadoPagoPreferenceId: paymentInfo.preference_id
+  //     }
+  //   })
+  //
+  //   // 2. Create venda items and update product stock
+  //   // for (const item of items) {
+  //   //   await tx.itemVenda.create({ ... })
+  //   //   await tx.produto.update({
+  //   //     where: { id: item.id },
+  //   //     data: { vendido: true, estoque: { decrement: item.quantidade } }
+  //   //   })
+  //   // }
+  //
+  //   return novaVenda
   // })
 
-  // TODO: Update product stock
   // TODO: Send confirmation email
   // TODO: Trigger order fulfillment
 
@@ -134,6 +173,31 @@ async function handleApprovedPayment(paymentInfo: any) {
 
 async function handlePendingPayment(paymentInfo: any) {
   console.log('⏳ Payment PENDING:', paymentInfo.id)
+
+  const paymentId = paymentInfo.id.toString()
+
+  // IDEMPOTENCY CHECK: Verify if this payment was already processed
+  const vendaExistente = await prisma.venda.findUnique({
+    where: { mercadoPagoPaymentId: paymentId }
+  })
+
+  if (vendaExistente) {
+    console.log('⚠️  Payment already processed:', paymentId)
+
+    // Update status if changed
+    if (vendaExistente.mercadoPagoStatus !== paymentInfo.status) {
+      await prisma.venda.update({
+        where: { id: vendaExistente.id },
+        data: {
+          status: 'PENDENTE',
+          mercadoPagoStatus: paymentInfo.status
+        }
+      })
+      console.log('   Status updated to PENDING')
+    }
+
+    return // Don't process again
+  }
 
   // TODO: Create sale with PENDING status
   // TODO: Send pending payment email
@@ -144,19 +208,70 @@ async function handlePendingPayment(paymentInfo: any) {
 async function handleRejectedPayment(paymentInfo: any) {
   console.log('❌ Payment REJECTED:', paymentInfo.id)
 
-  // TODO: Mark sale as cancelled if exists
-  // TODO: Send rejection email
+  const paymentId = paymentInfo.id.toString()
 
-  console.log('⚠️  Pagamento recusado')
+  // IDEMPOTENCY CHECK: Find existing sale
+  const vendaExistente = await prisma.venda.findUnique({
+    where: { mercadoPagoPaymentId: paymentId }
+  })
+
+  if (vendaExistente) {
+    console.log('   Found existing sale:', vendaExistente.id)
+
+    // Update status to cancelled
+    if (vendaExistente.status !== 'CANCELADO') {
+      await prisma.venda.update({
+        where: { id: vendaExistente.id },
+        data: {
+          status: 'CANCELADO',
+          mercadoPagoStatus: paymentInfo.status
+        }
+      })
+      console.log('   Sale marked as CANCELLED')
+
+      // TODO: Restore product stock if it was already reserved
+    }
+
+    return
+  }
+
+  // If no sale exists yet, just log it (it may never be created)
+  console.log('⚠️  Pagamento recusado (nenhuma venda criada)')
 }
 
 async function handleRefundedPayment(paymentInfo: any) {
   console.log('↩️  Payment REFUNDED:', paymentInfo.id)
 
-  // TODO: Find sale by payment ID
-  // TODO: Update sale status to DEVOLVIDA
-  // TODO: Restore product stock
-  // TODO: Send refund confirmation email
+  const paymentId = paymentInfo.id.toString()
+
+  // IDEMPOTENCY CHECK: Find existing sale
+  const vendaExistente = await prisma.venda.findUnique({
+    where: { mercadoPagoPaymentId: paymentId }
+  })
+
+  if (!vendaExistente) {
+    console.log('⚠️  No sale found for refunded payment:', paymentId)
+    return
+  }
+
+  console.log('   Found sale:', vendaExistente.id)
+
+  // Update status to ESTORNADO (only if not already updated)
+  if (vendaExistente.status !== 'ESTORNADO') {
+    await prisma.venda.update({
+      where: { id: vendaExistente.id },
+      data: {
+        status: 'ESTORNADO',
+        mercadoPagoStatus: paymentInfo.status
+      }
+    })
+    console.log('   Sale marked as REFUNDED')
+
+    // TODO: Restore product stock
+    // TODO: Send refund confirmation email
+  } else {
+    console.log('   Sale already marked as REFUNDED (idempotent)')
+  }
 
   console.log('↩️  Venda estornada e estoque restaurado')
 }

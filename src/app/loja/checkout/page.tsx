@@ -50,8 +50,17 @@ export default function CheckoutPage() {
       return
     }
 
+    // Create AbortController with 5s timeout
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 5000)
+
     try {
-      const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`)
+      const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`, {
+        signal: controller.signal
+      })
+
+      clearTimeout(timeoutId)
+
       const data = await response.json()
 
       if (data.erro) {
@@ -66,8 +75,14 @@ export default function CheckoutPage() {
         cidade: data.localidade,
         estado: data.uf
       })
-    } catch (err) {
-      alert('Erro ao buscar CEP')
+    } catch (err: any) {
+      clearTimeout(timeoutId)
+
+      if (err.name === 'AbortError') {
+        alert('Tempo esgotado ao buscar CEP. Tente novamente.')
+      } else {
+        alert('Erro ao buscar CEP')
+      }
     }
   }
 
@@ -87,7 +102,45 @@ export default function CheckoutPage() {
     setError('')
 
     try {
-      // Create Mercado Pago preference
+      // Step 1: Verify stock availability before creating payment
+      const stockCheck = await fetch('/api/produtos/verificar-estoque', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          items: items.map(item => ({
+            id: item.id,
+            quantidade: item.quantity
+          }))
+        })
+      })
+
+      const stockData = await stockCheck.json()
+
+      if (!stockData.disponivel) {
+        // Build error message for unavailable products
+        const problemasDescricao = stockData.produtosIndisponiveis
+          .map((p: any) => {
+            switch (p.problema) {
+              case 'PRODUTO_NAO_ENCONTRADO':
+                return `"${p.nome}" não foi encontrado`
+              case 'PRODUTO_INATIVO':
+                return `"${p.nome}" não está mais disponível`
+              case 'PRODUTO_VENDIDO':
+                return `"${p.nome}" já foi vendido`
+              case 'ESTOQUE_INSUFICIENTE':
+                return `"${p.nome}" tem estoque insuficiente (disponível: ${p.estoqueDisponivel})`
+              default:
+                return `"${p.nome}" não está disponível`
+            }
+          })
+          .join(', ')
+
+        setError(`Produtos indisponíveis: ${problemasDescricao}. Por favor, atualize seu carrinho.`)
+        setLoading(false)
+        return
+      }
+
+      // Step 2: Create Mercado Pago preference
       const response = await fetch('/api/pagamento/criar-preferencia', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

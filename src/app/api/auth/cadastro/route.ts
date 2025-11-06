@@ -2,21 +2,22 @@ import { NextRequest, NextResponse } from 'next/server'
 import { hash } from 'bcryptjs'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
+import { validarCPF, validarTelefone } from '@/lib/validators'
 
 const cadastroSchema = z.object({
   nome: z.string().min(3, 'Nome deve ter no mínimo 3 caracteres'),
   email: z.string().email('Email inválido'),
   senha: z.string().min(8, 'Senha deve ter no mínimo 8 caracteres'),
   confirmarSenha: z.string().min(8, 'Confirmação de senha deve ter no mínimo 8 caracteres'),
-  telefone: z.string().min(10, 'Telefone inválido'),
-  cpf: z.string().min(11, 'CPF inválido'),
+  telefone: z.string().refine(validarTelefone, 'Telefone inválido'),
+  cpf: z.string().refine(validarCPF, 'CPF inválido'),
   endereco: z.object({
-    cep: z.string(),
-    rua: z.string(),
-    numero: z.string(),
+    cep: z.string().regex(/^\d{5}-?\d{3}$/, 'CEP inválido'),
+    rua: z.string().min(1, 'Rua é obrigatória'),
+    numero: z.string().min(1, 'Número é obrigatório'),
     complemento: z.string().optional(),
-    bairro: z.string(),
-    cidade: z.string(),
+    bairro: z.string().min(1, 'Bairro é obrigatório'),
+    cidade: z.string().min(1, 'Cidade é obrigatória'),
     estado: z.string().length(2, 'Estado deve ter 2 caracteres')
   })
 }).refine((data) => data.senha === data.confirmarSenha, {

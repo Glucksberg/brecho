@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { hash } from 'bcryptjs'
+import { createHash } from 'crypto'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
 
@@ -13,10 +14,14 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { token, senha } = redefinirSenhaSchema.parse(body)
 
+    // Hash the incoming token to compare with stored hash
+    // Tokens are stored as SHA-256 hashes for security
+    const hashedToken = createHash('sha256').update(token).digest('hex')
+
     // Find user with valid token
     const user = await prisma.user.findFirst({
       where: {
-        resetToken: token,
+        resetToken: hashedToken, // Compare with hashed token
         resetTokenExpiry: {
           gt: new Date() // Token not expired
         }

@@ -1,15 +1,17 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Card, CardHeader, CardTitle, CardContent, Button, Input } from '@/components/ui'
 import { User, Mail, Lock, Phone, MapPin, Building } from 'lucide-react'
+import { validarEmail, validarCPF, validarTelefone } from '@/lib/validators'
 
 export default function CadastroPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
   const [formData, setFormData] = useState({
     nome: '',
     email: '',
@@ -27,6 +29,38 @@ export default function CadastroPage() {
       estado: ''
     }
   })
+
+  // Validação em tempo real
+  useEffect(() => {
+    const errors: Record<string, string> = {}
+
+    // Valida email
+    if (formData.email && !validarEmail(formData.email)) {
+      errors.email = 'Email inválido'
+    }
+
+    // Valida CPF
+    if (formData.cpf && !validarCPF(formData.cpf)) {
+      errors.cpf = 'CPF inválido'
+    }
+
+    // Valida telefone
+    if (formData.telefone && !validarTelefone(formData.telefone)) {
+      errors.telefone = 'Telefone inválido (mínimo 10 dígitos)'
+    }
+
+    // Valida senha
+    if (formData.senha && formData.senha.length < 8) {
+      errors.senha = 'Senha deve ter no mínimo 8 caracteres'
+    }
+
+    // Valida confirmação de senha
+    if (formData.confirmarSenha && formData.senha !== formData.confirmarSenha) {
+      errors.confirmarSenha = 'As senhas não coincidem'
+    }
+
+    setValidationErrors(errors)
+  }, [formData.email, formData.cpf, formData.telefone, formData.senha, formData.confirmarSenha])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
@@ -48,20 +82,26 @@ export default function CadastroPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+
+    // Verifica se há erros de validação
+    if (Object.keys(validationErrors).length > 0) {
+      setError('Por favor, corrija os erros no formulário antes de continuar')
+      return
+    }
+
+    // Validações adicionais
+    if (!formData.nome || !formData.email || !formData.senha || !formData.cpf || !formData.telefone) {
+      setError('Preencha todos os campos obrigatórios')
+      return
+    }
+
+    if (!formData.endereco.cep || !formData.endereco.rua || !formData.endereco.numero ||
+        !formData.endereco.bairro || !formData.endereco.cidade || !formData.endereco.estado) {
+      setError('Preencha todos os campos de endereço')
+      return
+    }
+
     setLoading(true)
-
-    // Validations
-    if (formData.senha !== formData.confirmarSenha) {
-      setError('As senhas não coincidem')
-      setLoading(false)
-      return
-    }
-
-    if (formData.senha.length < 8) {
-      setError('A senha deve ter no mínimo 8 caracteres')
-      setLoading(false)
-      return
-    }
 
     try {
       const response = await fetch('/api/auth/cadastro', {
@@ -93,8 +133,17 @@ export default function CadastroPage() {
       return
     }
 
+    // Create AbortController with 5s timeout
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 5000)
+
     try {
-      const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`)
+      const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`, {
+        signal: controller.signal
+      })
+
+      clearTimeout(timeoutId)
+
       const data = await response.json()
 
       if (data.erro) {
@@ -112,8 +161,14 @@ export default function CadastroPage() {
           estado: data.uf
         }
       }))
-    } catch (err) {
-      setError('Erro ao buscar CEP')
+    } catch (err: any) {
+      clearTimeout(timeoutId)
+
+      if (err.name === 'AbortError') {
+        setError('Tempo esgotado ao buscar CEP. Tente novamente.')
+      } else {
+        setError('Erro ao buscar CEP')
+      }
     }
   }
 

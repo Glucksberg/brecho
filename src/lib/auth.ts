@@ -9,6 +9,14 @@ import { UserRole } from '@prisma/client'
 /**
  * NextAuth Configuration
  * Sistema de autenticação para Retrô Carólis
+ *
+ * CSRF Protection:
+ * NextAuth fornece proteção CSRF automática para todas as rotas de autenticação.
+ * O secret NEXTAUTH_SECRET é usado para gerar e validar tokens CSRF.
+ *
+ * ⚠️ IMPORTANTE: Para APIs customizadas (vendas, produtos, etc.), você deve
+ * adicionar validação de sessão manualmente usando getServerSession().
+ * Ver: CSRF_PROTECTION.md para mais informações.
  */
 
 export const authOptions: NextAuthOptions = {

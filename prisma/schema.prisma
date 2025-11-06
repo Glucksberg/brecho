@@ -436,6 +436,11 @@ model Venda {
   formaPagamento  FormaPagamento
   status          StatusVenda    @default(PENDENTE)
 
+  // Mercado Pago (para vendas online)
+  mercadoPagoPaymentId   String?  @unique // Payment ID do Mercado Pago (para idempotência)
+  mercadoPagoStatus      String?  // Status do pagamento no MP
+  mercadoPagoPreferenceId String? // Preference ID criada
+
   // Origem
   origem          OrigemVenda    @default(PRESENCIAL)
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { randomBytes } from 'crypto'
+import { randomBytes, createHash } from 'crypto'
 import { z } from 'zod'
 
 const esqueciSenhaSchema = z.object({
@@ -25,20 +25,26 @@ export async function POST(request: NextRequest) {
     }
 
     // Generate reset token (valid for 1 hour)
+    // Generate a random token that will be sent via email
     const resetToken = randomBytes(32).toString('hex')
     const resetTokenExpiry = new Date(Date.now() + 3600000) // 1 hour
 
-    // Save token to database
+    // Hash the token before storing in database (SHA-256)
+    // This way if DB is compromised, attacker can't use tokens to reset passwords
+    const hashedToken = createHash('sha256').update(resetToken).digest('hex')
+
+    // Save HASHED token to database (NOT the original)
     await prisma.user.update({
       where: { id: user.id },
       data: {
-        resetToken,
+        resetToken: hashedToken,
         resetTokenExpiry
       }
     })
 
     // TODO: Send email with reset link
     // In production, use a service like SendGrid, AWS SES, or Resend
+    // IMPORTANT: Send the ORIGINAL token (not hashed) via email
     const resetLink = `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/redefinir-senha?token=${resetToken}`
 
     console.log('=== PASSWORD RESET LINK ===')
