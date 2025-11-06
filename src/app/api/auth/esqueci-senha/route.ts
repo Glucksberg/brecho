@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { logger } from '@/lib/logger'
 import { randomBytes, createHash } from 'crypto'
 import { z } from 'zod'
 
@@ -56,7 +57,7 @@ export async function POST(request: NextRequest) {
       message: 'Se o email existe, um link de recuperação foi enviado'
     })
   } catch (error: any) {
-    console.error('Erro ao processar esqueci senha:', error)
+    logger.error('Error processing password reset request', { error: error.message })
 
     if (error.name === 'ZodError') {
       return NextResponse.json(

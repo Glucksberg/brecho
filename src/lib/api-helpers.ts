@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import type { ApiResponse, ApiError } from '@/types'
+import { logger } from './logger'
 
 /**
  * Success response helper
@@ -99,7 +100,7 @@ export function buildPaginationResponse<T>(
  * Handle API errors
  */
 export function handleApiError(error: unknown): NextResponse<ApiResponse> {
-  console.error('API Error:', error)
+  logger.error('API Error', { error })
 
   if (error instanceof Error) {
     // Prisma errors
