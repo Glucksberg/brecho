@@ -42,21 +42,15 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    // TODO: Send email with reset link
-    // In production, use a service like SendGrid, AWS SES, or Resend
+    // Send password reset email
     // IMPORTANT: Send the ORIGINAL token (not hashed) via email
-    const resetLink = `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/redefinir-senha?token=${resetToken}`
+    const { sendPasswordResetEmail } = await import('@/lib/email')
 
-    console.log('=== PASSWORD RESET LINK ===')
-    console.log(`User: ${user.email}`)
-    console.log(`Link: ${resetLink}`)
-    console.log('===========================')
-
-    // For now, just log the link (in production, send email)
-    // Example email content:
-    // Subject: Redefinir Senha - Retrô Carólis
-    // Body: Clique no link para redefinir sua senha: {resetLink}
-    //       O link expira em 1 hora.
+    await sendPasswordResetEmail({
+      email: user.email,
+      name: user.name || 'Usuário',
+      resetToken
+    })
 
     return NextResponse.json({
       message: 'Se o email existe, um link de recuperação foi enviado'

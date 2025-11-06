@@ -331,6 +331,7 @@ model Produto {
   // Relações
   itensVenda      ItemVenda[]
 
+  // Índices simples
   @@index([brechoId])
   @@index([slug])
   @@index([tipo])
@@ -338,6 +339,14 @@ model Produto {
   @@index([categoria])
   @@index([ativo])
   @@index([vendido])
+
+  // Índices compostos para queries comuns
+  @@index([brechoId, ativo, categoria])
+  @@index([brechoId, vendido])
+  @@index([brechoId, ativo, destaque])
+  @@index([fornecedoraId, vendido])
+  @@index([tipo, ativo])
+
   @@map("produtos")
 }
 
@@ -380,8 +389,14 @@ model Cliente {
   vendas         Venda[]
   trocas         Troca[]
 
+  // Índices simples
   @@index([brechoId])
   @@index([email])
+
+  // Índices compostos
+  @@index([brechoId, ativo])
+  @@index([email, brechoId])
+
   @@map("clientes")
 }
 
@@ -468,12 +483,21 @@ model Venda {
   creditos        Credito[]
   trocas          Troca[]
 
+  // Índices simples
   @@index([brechoId])
   @@index([clienteId])
   @@index([vendedorId])
   @@index([status])
   @@index([origem])
   @@index([dataVenda])
+
+  // Índices compostos para queries comuns
+  @@index([brechoId, status, dataVenda])
+  @@index([origem, status, dataVenda])
+  @@index([clienteId, status])
+  @@index([vendedorId, dataVenda])
+  @@index([mercadoPagoPaymentId])
+
   @@map("vendas")
 }
 
@@ -706,9 +730,16 @@ model Despesa {
   createdAt             DateTime         @default(now())
   updatedAt             DateTime         @updatedAt
 
+  // Índices simples
   @@index([brechoId])
   @@index([status])
   @@index([categoria])
   @@index([dataVencimento])
+
+  // Índices compostos
+  @@index([brechoId, status])
+  @@index([brechoId, categoria, status])
+  @@index([status, dataVencimento])
+
   @@map("despesas")
 }
