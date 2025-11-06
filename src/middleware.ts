@@ -1,47 +1,82 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { getToken } from 'next-auth/jwt'
 
 /**
- * Middleware para Next.js
- * Executa antes de cada requisição
+ * Middleware de autenticação e autorização
  *
- * Funções:
- * - Autenticação (verificar se usuário está logado)
- * - Autorização (verificar permissões de acesso)
- * - Multi-tenant (identificar brechó pelo domínio)
- * - Redirect de rotas
+ * Protege rotas que requerem autenticação:
+ * - /admin/* - Apenas admin e dono
+ * - /dashboard/* - Usuários autenticados
+ * - /api/* (exceto auth) - APIs requerem autenticação
  */
 
-export function middleware(request: NextRequest) {
+// Rotas públicas que não requerem autenticação
+const publicPaths = [
+  '/',
+  '/login',
+  '/cadastro',
+  '/loja',
+  '/produto',
+  '/carrinho',
+  '/checkout',
+  '/esqueci-senha',
+  '/redefinir-senha',
+]
+
+// Rotas de API públicas
+const publicApiPaths = [
+  '/api/auth',
+  '/api/webhooks',
+  '/api/produtos',
+  '/api/categorias',
+  '/api/pagamento/criar-preferencia',
+]
+
+// Rotas que requerem admin
+const adminPaths = [
+  '/admin',
+  '/relatorios',
+  '/configuracoes',
+]
+
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // Public routes que não requerem autenticação
-  const publicRoutes = ['/login', '/loja', '/api/auth']
-  const isPublicRoute = publicRoutes.some(route => pathname.startsWith(route))
-
-  if (isPublicRoute) {
+  // Allow public paths
+  if (publicPaths.some(path => pathname.startsWith(path))) {
     return NextResponse.next()
   }
 
-  // TODO: Implementar verificação de autenticação
-  // const token = request.cookies.get('next-auth.session-token')
-  // if (!token) {
-  //   return NextResponse.redirect(new URL('/login', request.url))
-  // }
+  // Allow public API paths
+  if (publicApiPaths.some(path => pathname.startsWith(path))) {
+    return NextResponse.next()
+  }
 
-  // TODO: Implementar verificação de permissões
-  // const user = await getUser(token)
-  // if (!canAccessRoute(user, pathname)) {
-  //   return NextResponse.redirect(new URL('/unauthorized', request.url))
-  // }
+  // Get token from request
+  const token = await getToken({
+    req: request,
+    secret: process.env.NEXTAUTH_SECRET,
+  })
 
-  // TODO: Implementar multi-tenant por domínio
-  // const hostname = request.headers.get('host')
-  // const brecho = await getBrechoByDomain(hostname)
-  // if (!brecho) {
-  //   return NextResponse.redirect(new URL('/not-found', request.url))
-  // }
+  // Not authenticated - redirect to login
+  if (!token) {
+    const loginUrl = new URL('/login', request.url)
+    loginUrl.searchParams.set('callbackUrl', pathname)
+    return NextResponse.redirect(loginUrl)
+  }
 
+  // Check admin access
+  if (adminPaths.some(path => pathname.startsWith(path))) {
+    const userRole = token.role as string
+
+    if (userRole !== 'ADMIN' && userRole !== 'DONO') {
+      // Unauthorized - redirect to dashboard
+      return NextResponse.redirect(new URL('/dashboard', request.url))
+    }
+  }
+
+  // Authenticated and authorized
   return NextResponse.next()
 }
 
@@ -54,6 +89,6 @@ export const config = {
      * - favicon.ico (favicon file)
      * - public folder
      */
-    '/((?!_next/static|_next/image|favicon.ico|public).*)',
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }

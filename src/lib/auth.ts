@@ -1,8 +1,9 @@
-import { NextAuthOptions } from 'next-auth'
+import { NextAuthOptions, getServerSession as nextAuthGetServerSession } from 'next-auth'
 import { PrismaAdapter } from '@next-auth/prisma-adapter'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import { prisma } from './prisma'
 import { compare } from 'bcryptjs'
+import { logger } from './logger'
 import type { SessionUser } from '@/types'
 import { UserRole } from '@prisma/client'
 
@@ -51,27 +52,30 @@ export const authOptions: NextAuthOptions = {
           throw new Error('Usuário inativo. Entre em contato com o administrador.')
         }
 
-        // Verifica senha (assumindo que você tem uma coluna 'senha' no User)
-        // TODO: Adicionar coluna 'senha' no schema.prisma se ainda não existir
-        // const isPasswordValid = await compare(credentials.password, user.senha)
+        // Verify password
+        if (!user.password) {
+          logger.error('User has no password set', { userId: user.id, email: user.email })
+          throw new Error('Credenciais inválidas')
+        }
 
-        // Por enquanto, vamos usar uma verificação simples (REMOVER EM PRODUÇÃO)
-        // const isPasswordValid = credentials.password === 'senha123'
+        const isPasswordValid = await compare(credentials.password, user.password)
 
-        // if (!isPasswordValid) {
-        //   throw new Error('Credenciais inválidas')
-        // }
+        if (!isPasswordValid) {
+          logger.warn('Invalid password attempt', { email: user.email })
+          throw new Error('Credenciais inválidas')
+        }
 
-        // Retorna usuário autenticado
+        logger.info('User authenticated successfully', { userId: user.id, email: user.email })
+
+        // Return authenticated user
         return {
           id: user.id,
-          name: user.nome,
+          name: user.name,
           email: user.email,
-          tipo: user.tipo,
+          role: user.role,
           brechoId: user.brechoId,
-          fornecedoraId: user.fornecedoraId,
-          avatar: user.avatar,
-          permissoes: user.permissoes as string[]
+          avatar: user.image,
+          permissoes: user.permissoes
         }
       }
     })
@@ -93,9 +97,8 @@ export const authOptions: NextAuthOptions = {
       // Initial sign in
       if (user) {
         token.id = user.id
-        token.tipo = user.tipo
+        token.role = user.role
         token.brechoId = user.brechoId
-        token.fornecedoraId = user.fornecedoraId
         token.avatar = user.avatar
         token.permissoes = user.permissoes || []
       }
@@ -114,9 +117,8 @@ export const authOptions: NextAuthOptions = {
           id: token.id as string,
           nome: token.name as string,
           email: token.email as string,
-          tipo: token.tipo as UserRole,
+          tipo: token.role as UserRole,
           brechoId: token.brechoId as string,
-          fornecedoraId: token.fornecedoraId as string | undefined,
           avatar: token.avatar as string | undefined,
           permissoes: (token.permissoes as string[]) || []
         }
@@ -135,9 +137,7 @@ export const authOptions: NextAuthOptions = {
  * Helper para obter sessão do servidor (Server Components)
  */
 export async function getServerSession() {
-  // TODO: Implementar quando tiver getServerSession do next-auth
-  // return await getServerSession(authOptions)
-  return null
+  return await nextAuthGetServerSession(authOptions)
 }
 
 /**
