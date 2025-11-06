@@ -1,10 +1,11 @@
 import { MercadoPagoConfig, Payment, Preference } from 'mercadopago'
+import { logger } from './logger'
 
 // Configuração do Mercado Pago
 const accessToken = process.env.MERCADOPAGO_ACCESS_TOKEN || ''
 
 if (!accessToken && process.env.NODE_ENV === 'production') {
-  console.warn('⚠️  MERCADOPAGO_ACCESS_TOKEN não configurado!')
+  logger.warn('MERCADOPAGO_ACCESS_TOKEN not configured')
 }
 
 export const mercadopagoClient = new MercadoPagoConfig({
@@ -176,8 +177,8 @@ export async function createCheckoutPreference(
     })
 
     return response as unknown as MercadoPagoPreferenceResponse
-  } catch (error) {
-    console.error('Erro ao criar preferência Mercado Pago:', error)
+  } catch (error: any) {
+    logger.error('Error creating Mercado Pago preference', { error: error.message })
     throw error
   }
 }
@@ -190,8 +191,8 @@ export async function getPaymentInfo(paymentId: string): Promise<MercadoPagoPaym
     })
 
     return response as unknown as MercadoPagoPaymentInfo
-  } catch (error) {
-    console.error('Erro ao buscar pagamento Mercado Pago:', error)
+  } catch (error: any) {
+    logger.error('Error fetching Mercado Pago payment', { paymentId, error: error.message })
     throw error
   }
 }

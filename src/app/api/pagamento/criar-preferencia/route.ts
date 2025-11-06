@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createCheckoutPreference, isConfigured, MercadoPagoItem } from '@/lib/mercadopago'
 import { prisma } from '@/lib/prisma'
+import { logger } from '@/lib/logger'
 import { z } from 'zod'
 
 const itemSchema = z.object({
@@ -169,7 +170,10 @@ export async function POST(request: NextRequest) {
       vendaId: venda.id // Return venda ID for tracking
     })
   } catch (error: any) {
-    console.error('Erro ao criar preferência:', error)
+    logger.error('Error creating Mercado Pago preference', {
+      error: error.message,
+      stack: error.stack
+    })
 
     if (error.name === 'ZodError') {
       return NextResponse.json(

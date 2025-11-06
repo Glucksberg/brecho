@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getPaymentInfo, MercadoPagoPaymentNotification } from '@/lib/mercadopago'
 import { prisma } from '@/lib/prisma'
+import { logger } from '@/lib/logger'
 import { createHmac } from 'crypto'
 
 // Verify Mercado Pago webhook signature
@@ -22,7 +23,7 @@ function verifyWebhookSignature(
   // Get secret from Mercado Pago Webhook settings
   const secret = process.env.MERCADOPAGO_WEBHOOK_SECRET || ''
   if (!secret) {
-    console.warn('⚠️ MERCADOPAGO_WEBHOOK_SECRET not set - webhook signature validation disabled')
+    logger.warn('MERCADOPAGO_WEBHOOK_SECRET not set - webhook signature validation disabled')
     return true // Allow in dev/test if not configured
   }
 
@@ -47,18 +48,19 @@ export async function POST(request: NextRequest) {
     const dataId = body.data?.id || ''
 
     if (!verifyWebhookSignature(xSignature, xRequestId, dataId)) {
-      console.error('❌ Invalid webhook signature - possible attack')
+      logger.error('Invalid webhook signature - possible attack', { xSignature, xRequestId, dataId })
       return NextResponse.json(
         { error: 'Invalid signature' },
         { status: 401 }
       )
     }
 
-    console.log('✅ Webhook signature verified')
-    console.log('=== MERCADO PAGO WEBHOOK ===')
-    console.log('Type:', body.type)
-    console.log('Action:', body.action)
-    console.log('Data ID:', dataId)
+    logger.info('Webhook signature verified')
+    logger.info('Mercado Pago webhook received', {
+      type: body.type,
+      action: body.action,
+      dataId
+    })
 
     // We only handle payment notifications
     if (body.type !== 'payment') {
@@ -69,7 +71,7 @@ export async function POST(request: NextRequest) {
     const paymentId = body.data.id
     const paymentInfo = await getPaymentInfo(paymentId)
 
-    console.log('Payment Info:', JSON.stringify(paymentInfo, null, 2))
+    logger.debug('Payment info retrieved', { paymentId, status: paymentInfo.status })
 
     // TODO: Process payment based on status
     switch (paymentInfo.status) {
@@ -95,7 +97,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ received: true })
   } catch (error: any) {
-    console.error('Erro ao processar webhook Mercado Pago:', error)
+    logger.error('Error processing Mercado Pago webhook', { error: error.message, stack: error.stack })
 
     // Always return 200 to prevent retries
     return NextResponse.json(
@@ -108,13 +110,13 @@ export async function POST(request: NextRequest) {
 // Handlers for different payment statuses
 
 async function handleApprovedPayment(paymentInfo: any) {
-  console.log('💚 Payment APPROVED:', paymentInfo.id)
+  logger.info('Payment APPROVED', { paymentId: paymentInfo.id })
 
   const paymentId = paymentInfo.id.toString()
   const vendaId = paymentInfo.external_reference
 
   if (!vendaId) {
-    console.error('❌ No external_reference (venda ID) found in payment')
+    logger.error('No external_reference (venda ID) found in payment', { paymentId })
     return
   }
 
@@ -124,8 +126,7 @@ async function handleApprovedPayment(paymentInfo: any) {
   })
 
   if (vendaExistente) {
-    console.log('⚠️  Payment already processed:', paymentId)
-    console.log('   Existing sale ID:', vendaExistente.id)
+    logger.warn('Payment already processed', { paymentId, vendaId: vendaExistente.id })
 
     // If status changed, update it
     if (vendaExistente.status !== 'FINALIZADA') {
@@ -137,13 +138,13 @@ async function handleApprovedPayment(paymentInfo: any) {
           dataAtualizacao: new Date()
         }
       })
-      console.log('   Status updated to FINALIZADA')
+      logger.info('Status updated to FINALIZADA', { vendaId: vendaExistente.id })
     }
 
     return // Don't process again
   }
 
-  console.log('Processing approved payment for venda:', vendaId)
+  logger.info('Processing approved payment', { paymentId, vendaId })
 
   // Process payment and finalize sale
   await prisma.$transaction(async (tx) => {
@@ -170,11 +171,11 @@ async function handleApprovedPayment(paymentInfo: any) {
     }
 
     if (venda.status !== 'PENDENTE_PAGAMENTO') {
-      console.warn(`⚠️  Venda ${vendaId} already processed with status: ${venda.status}`)
+      logger.warn('Venda already processed', { vendaId, status: venda.status })
       return
     }
 
-    console.log(`   Processing ${venda.items.length} items...`)
+    logger.debug('Processing sale items', { vendaId, itemCount: venda.items.length })
 
     // 2. Update venda to FINALIZADA
     await tx.venda.update({
@@ -201,7 +202,7 @@ async function handleApprovedPayment(paymentInfo: any) {
         }
       })
 
-      console.log(`   ✓ Product ${produto.nome} marked as sold`)
+      logger.debug('Product marked as sold', { produtoId: produto.id, produtoNome: produto.nome })
 
       // Create crédito for consignment products
       if (produto.tipo === 'CONSIGNADO' && produto.fornecedoraId && produto.fornecedora) {
@@ -218,7 +219,10 @@ async function handleApprovedPayment(paymentInfo: any) {
           }
         })
 
-        console.log(`   ✓ Credit created for ${produto.fornecedora.nome}: R$ ${valorCredito.toFixed(2)}`)
+        logger.debug('Credit created for supplier', {
+          fornecedoraNome: produto.fornecedora.nome,
+          valorCredito
+        })
       }
     }
 
@@ -245,25 +249,25 @@ async function handleApprovedPayment(paymentInfo: any) {
           shippingAddress: venda.enderecoEntrega as any
         })
 
-        console.log('   ✓ Confirmation email sent to:', customerEmail)
+        logger.info('Confirmation email sent', { customerEmail, vendaId })
       }
     } catch (emailError) {
-      console.error('   ⚠️  Error sending confirmation email:', emailError)
+      logger.error('Error sending confirmation email', { error: emailError })
       // Don't fail the transaction if email fails
     }
   })
 
-  console.log('✅ Sale finalized and stock updated successfully')
+  logger.info('Sale finalized and stock updated successfully', { vendaId, paymentId })
 }
 
 async function handlePendingPayment(paymentInfo: any) {
-  console.log('⏳ Payment PENDING:', paymentInfo.id)
+  logger.info('Payment PENDING', { paymentId: paymentInfo.id })
 
   const paymentId = paymentInfo.id.toString()
   const vendaId = paymentInfo.external_reference
 
   if (!vendaId) {
-    console.error('❌ No external_reference (venda ID) found in payment')
+    logger.error('No external_reference (venda ID) found in payment', { paymentId })
     return
   }
 
@@ -273,7 +277,7 @@ async function handlePendingPayment(paymentInfo: any) {
   })
 
   if (vendaExistente) {
-    console.log('⚠️  Payment already processed:', paymentId)
+    logger.warn('Payment already processed', { paymentId, vendaId: vendaExistente.id })
 
     // Update status if changed
     if (vendaExistente.mercadoPagoStatus !== paymentInfo.status) {
@@ -284,7 +288,7 @@ async function handlePendingPayment(paymentInfo: any) {
           dataAtualizacao: new Date()
         }
       })
-      console.log('   Status updated')
+      logger.debug('Status updated', { vendaId: vendaExistente.id })
     }
 
     return // Don't process again
@@ -300,11 +304,11 @@ async function handlePendingPayment(paymentInfo: any) {
     }
   })
 
-  console.log('⚠️  Venda aguardando confirmação de pagamento')
+  logger.warn('Sale awaiting payment confirmation', { vendaId, paymentId })
 }
 
 async function handleRejectedPayment(paymentInfo: any) {
-  console.log('❌ Payment REJECTED:', paymentInfo.id)
+  logger.warn('Payment REJECTED', { paymentId: paymentInfo.id })
 
   const paymentId = paymentInfo.id.toString()
   const vendaId = paymentInfo.external_reference
@@ -315,7 +319,7 @@ async function handleRejectedPayment(paymentInfo: any) {
   })
 
   if (vendaExistente) {
-    console.log('   Found existing sale:', vendaExistente.id)
+    logger.info('Found existing sale', { vendaId: vendaExistente.id })
 
     // Update status to cancelled
     if (vendaExistente.status !== 'CANCELADO') {
@@ -327,7 +331,7 @@ async function handleRejectedPayment(paymentInfo: any) {
           dataAtualizacao: new Date()
         }
       })
-      console.log('   Sale marked as CANCELLED')
+      logger.info('Sale marked as CANCELLED', { vendaId: vendaExistente.id })
     }
 
     return
@@ -344,14 +348,14 @@ async function handleRejectedPayment(paymentInfo: any) {
         dataAtualizacao: new Date()
       }
     })
-    console.log('   Pending sale marked as CANCELLED')
+    logger.info('Pending sale marked as CANCELLED', { vendaId })
   } else {
-    console.log('⚠️  Payment rejected (no venda reference)')
+    logger.warn('Payment rejected (no venda reference)', { paymentId })
   }
 }
 
 async function handleRefundedPayment(paymentInfo: any) {
-  console.log('↩️  Payment REFUNDED:', paymentInfo.id)
+  logger.info('Payment REFUNDED', { paymentId: paymentInfo.id })
 
   const paymentId = paymentInfo.id.toString()
 
@@ -368,11 +372,11 @@ async function handleRefundedPayment(paymentInfo: any) {
   })
 
   if (!vendaExistente) {
-    console.log('⚠️  No sale found for refunded payment:', paymentId)
+    logger.warn('No sale found for refunded payment', { paymentId })
     return
   }
 
-  console.log('   Found sale:', vendaExistente.id)
+  logger.info('Found sale for refund', { vendaId: vendaExistente.id })
 
   // Update status to ESTORNADO and restore stock (only if not already updated)
   if (vendaExistente.status !== 'ESTORNADO') {
@@ -397,16 +401,16 @@ async function handleRefundedPayment(paymentInfo: any) {
           }
         })
 
-        console.log(`   ✓ Stock restored for ${item.produto.nome}`)
+        logger.debug('Stock restored', { produtoId: item.produtoId, produtoNome: item.produto.nome })
       }
     })
 
-    console.log('   Sale marked as REFUNDED and stock restored')
+    logger.info('Sale marked as REFUNDED and stock restored', { vendaId: vendaExistente.id })
   } else {
-    console.log('   Sale already marked as REFUNDED (idempotent)')
+    logger.debug('Sale already marked as REFUNDED (idempotent)', { vendaId: vendaExistente.id })
   }
 
-  console.log('↩️  Refund processed successfully')
+  logger.info('Refund processed successfully', { vendaId: vendaExistente.id, paymentId })
 }
 
 // Helper to map Mercado Pago payment methods to our enum
