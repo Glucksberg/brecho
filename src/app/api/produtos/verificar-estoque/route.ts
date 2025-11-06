@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { logger } from '@/lib/logger'
 import { z } from 'zod'
 
 const verificarEstoqueSchema = z.object({
@@ -105,7 +106,7 @@ export async function POST(request: NextRequest) {
       mensagem: 'Todos os produtos estão disponíveis'
     })
   } catch (error: any) {
-    console.error('Erro ao verificar estoque:', error)
+    logger.error('Error verifying stock', { error: error?.message })
     return NextResponse.json(
       { error: 'Erro ao verificar disponibilidade dos produtos' },
       { status: 500 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { hash } from 'bcryptjs'
 import { prisma } from '@/lib/prisma'
+import { logger } from '@/lib/logger'
 import { z } from 'zod'
 import { validarCPF, validarTelefone } from '@/lib/validators'
 
@@ -83,20 +84,11 @@ export async function POST(request: NextRequest) {
       user
     })
   } catch (error: any) {
-    // Sanitize error before logging (remove sensitive data)
-    const sanitizedError = error.name === 'ZodError' ? {
+    logger.error('Error creating user', {
+      error: error.message,
       name: error.name,
-      issues: error.errors?.map((e: any) => ({
-        path: e.path,
-        message: e.message,
-        code: e.code
-      }))
-    } : {
-      message: error.message,
-      name: error.name
-    }
-
-    console.error('Erro ao criar usuário:', sanitizedError)
+      isZodError: error.name === 'ZodError'
+    })
 
     if (error.name === 'ZodError') {
       return NextResponse.json(

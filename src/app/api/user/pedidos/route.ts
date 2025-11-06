@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { logger } from '@/lib/logger'
 
 export async function GET(request: NextRequest) {
   try {
@@ -33,8 +34,8 @@ export async function GET(request: NextRequest) {
     ]
 
     return NextResponse.json({ pedidos })
-  } catch (error) {
-    console.error('Erro ao buscar pedidos:', error)
+  } catch (error: any) {
+    logger.error('Error fetching orders', { error: error?.message })
     return NextResponse.json(
       { error: 'Erro ao buscar pedidos' },
       { status: 500 }

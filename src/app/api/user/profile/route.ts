@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { logger } from '@/lib/logger'
 
 export async function GET(request: NextRequest) {
   try {
@@ -22,8 +23,8 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json({ usuario })
-  } catch (error) {
-    console.error('Erro ao buscar perfil:', error)
+  } catch (error: any) {
+    logger.error('Error fetching user profile', { error: error?.message })
     return NextResponse.json(
       { error: 'Erro ao buscar perfil' },
       { status: 500 }
@@ -42,8 +43,8 @@ export async function PUT(request: NextRequest) {
       message: 'Perfil atualizado com sucesso',
       usuario: body
     })
-  } catch (error) {
-    console.error('Erro ao atualizar perfil:', error)
+  } catch (error: any) {
+    logger.error('Error updating user profile', { error: error?.message })
     return NextResponse.json(
       { error: 'Erro ao atualizar perfil' },
       { status: 500 }

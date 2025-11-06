@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { hash } from 'bcryptjs'
 import { createHash } from 'crypto'
 import { prisma } from '@/lib/prisma'
+import { logger } from '@/lib/logger'
 import { z } from 'zod'
 
 const redefinirSenhaSchema = z.object({
@@ -52,14 +53,10 @@ export async function POST(request: NextRequest) {
       message: 'Senha redefinida com sucesso'
     })
   } catch (error: any) {
-    // Sanitize error before logging (remove password)
-    const sanitizedError = {
-      message: error.message,
-      name: error.name,
-      token: '[REDACTED]'
-    }
-
-    console.error('Erro ao redefinir senha:', sanitizedError)
+    logger.error('Error resetting password', {
+      error: error.message,
+      name: error.name
+    })
 
     if (error.name === 'ZodError') {
       return NextResponse.json(

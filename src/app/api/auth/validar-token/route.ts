@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { logger } from '@/lib/logger'
 
 export async function POST(request: NextRequest) {
   try {
@@ -30,8 +31,8 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({ valid: true })
-  } catch (error) {
-    console.error('Erro ao validar token:', error)
+  } catch (error: any) {
+    logger.error('Error validating token', { error: error?.message })
     return NextResponse.json(
       { error: 'Erro ao validar token' },
       { status: 500 }
