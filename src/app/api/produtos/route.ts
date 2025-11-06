@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { Prisma } from '@prisma/client'
 import {
   successResponse,
   errorResponse,
@@ -28,7 +29,7 @@ export async function GET(request: NextRequest) {
     const fornecedoraId = searchParams.get('fornecedoraId') || undefined
 
     // Build where clause
-    const where: any = {}
+    const where: Prisma.ProdutoWhereInput = {}
 
     if (search) {
       where.OR = [
@@ -39,9 +40,9 @@ export async function GET(request: NextRequest) {
       ]
     }
 
-    if (categoria) where.categoria = categoria
-    if (tipo) where.tipo = tipo
-    if (status) where.status = status
+    if (categoria) where.categoria = categoria as any // Categoria comes from URL params
+    if (tipo) where.tipo = tipo as any // Tipo comes from URL params
+    if (status) where.ativo = status === 'ativo'
     if (fornecedoraId) where.fornecedoraId = fornecedoraId
 
     // Get produtos

@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { Prisma } from '@prisma/client'
 import {
   successResponse,
   errorResponse,
@@ -42,21 +43,11 @@ export async function GET(request: NextRequest) {
     const categoria = searchParams.get('categoria')
     const search = searchParams.get('search') || undefined
 
-    type WhereClause = {
-      brechoId?: string
-      status?: string
-      categoria?: string
-      OR?: Array<{
-        descricao?: { contains: string; mode: 'insensitive' }
-        fornecedor?: { contains: string; mode: 'insensitive' }
-      }>
-    }
-
-    const where: WhereClause = {}
+    const where: Prisma.DespesaWhereInput = {}
 
     if (brechoId) where.brechoId = brechoId
-    if (status) where.status = status as any
-    if (categoria) where.categoria = categoria as any
+    if (status) where.status = status as any // Status comes from URL params
+    if (categoria) where.categoria = categoria as any // Categoria comes from URL params
 
     if (search) {
       where.OR = [
@@ -69,18 +60,15 @@ export async function GET(request: NextRequest) {
     const dataInicio = searchParams.get('dataInicio')
     const dataFim = searchParams.get('dataFim')
 
-    const dateFilter: any = {}
-    if (dataInicio) dateFilter.gte = new Date(dataInicio)
-    if (dataFim) dateFilter.lte = new Date(dataFim)
-
-    const whereWithDate = {
-      ...where,
-      ...(dataInicio || dataFim ? { dataVencimento: dateFilter } : {})
+    if (dataInicio || dataFim) {
+      where.dataVencimento = {}
+      if (dataInicio) where.dataVencimento.gte = new Date(dataInicio)
+      if (dataFim) where.dataVencimento.lte = new Date(dataFim)
     }
 
     const [despesas, total] = await Promise.all([
       prisma.despesa.findMany({
-        where: whereWithDate,
+        where,
         skip,
         take,
         orderBy: { dataVencimento: 'desc' },
@@ -93,7 +81,7 @@ export async function GET(request: NextRequest) {
           }
         }
       }),
-      prisma.despesa.count({ where: whereWithDate })
+      prisma.despesa.count({ where })
     ])
 
     const response = buildPaginationResponse(despesas, total, page, perPage)

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getPaymentInfo, MercadoPagoPaymentNotification } from '@/lib/mercadopago'
+import { getPaymentInfo, MercadoPagoPaymentNotification, MercadoPagoPaymentInfo } from '@/lib/mercadopago'
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
 import { createHmac } from 'crypto'
@@ -109,7 +109,7 @@ export async function POST(request: NextRequest) {
 
 // Handlers for different payment statuses
 
-async function handleApprovedPayment(paymentInfo: any) {
+async function handleApprovedPayment(paymentInfo: MercadoPagoPaymentInfo) {
   logger.info('Payment APPROVED', { paymentId: paymentInfo.id })
 
   const paymentId = paymentInfo.id.toString()
@@ -260,7 +260,7 @@ async function handleApprovedPayment(paymentInfo: any) {
   logger.info('Sale finalized and stock updated successfully', { vendaId, paymentId })
 }
 
-async function handlePendingPayment(paymentInfo: any) {
+async function handlePendingPayment(paymentInfo: MercadoPagoPaymentInfo) {
   logger.info('Payment PENDING', { paymentId: paymentInfo.id })
 
   const paymentId = paymentInfo.id.toString()
@@ -307,7 +307,7 @@ async function handlePendingPayment(paymentInfo: any) {
   logger.warn('Sale awaiting payment confirmation', { vendaId, paymentId })
 }
 
-async function handleRejectedPayment(paymentInfo: any) {
+async function handleRejectedPayment(paymentInfo: MercadoPagoPaymentInfo) {
   logger.warn('Payment REJECTED', { paymentId: paymentInfo.id })
 
   const paymentId = paymentInfo.id.toString()
@@ -354,7 +354,7 @@ async function handleRejectedPayment(paymentInfo: any) {
   }
 }
 
-async function handleRefundedPayment(paymentInfo: any) {
+async function handleRefundedPayment(paymentInfo: MercadoPagoPaymentInfo) {
   logger.info('Payment REFUNDED', { paymentId: paymentInfo.id })
 
   const paymentId = paymentInfo.id.toString()

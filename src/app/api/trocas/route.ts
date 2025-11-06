@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { Prisma } from '@prisma/client'
 import {
   successResponse,
   errorResponse,
@@ -24,11 +25,11 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status')
     const tipo = searchParams.get('tipo')
 
-    const where: any = {}
+    const where: Prisma.TrocaWhereInput = {}
 
     if (brechoId) where.brechoId = brechoId
-    if (status) where.status = status
-    if (tipo) where.tipo = tipo
+    if (status) where.status = status as any // Status comes from URL params
+    if (tipo) where.tipo = tipo as any // Tipo comes from URL params
 
     const [trocas, total] = await Promise.all([
       prisma.troca.findMany({

@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { Prisma } from '@prisma/client'
 import {
   successResponse,
   errorResponse,
@@ -27,12 +28,12 @@ export async function GET(request: NextRequest) {
     const clienteId = searchParams.get('clienteId')
     const vendedorId = searchParams.get('vendedorId')
 
-    const where: any = {}
+    const where: Prisma.VendaWhereInput = {}
 
     if (brechoId) where.brechoId = brechoId
-    if (status) where.status = status
-    if (origem) where.origem = origem
-    if (tipoPagamento) where.tipoPagamento = tipoPagamento
+    if (status) where.status = status as any // Status comes from URL params
+    if (origem) where.origem = origem as any // Origem comes from URL params
+    if (tipoPagamento) where.metodoPagamento = tipoPagamento
     if (clienteId) where.clienteId = clienteId
     if (vendedorId) where.vendedorId = vendedorId
 

@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { Prisma } from '@prisma/client'
 import {
   successResponse,
   errorResponse,
@@ -40,7 +41,7 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search') || undefined
     const brechoId = searchParams.get('brechoId')
 
-    const where: any = {}
+    const where: Prisma.ClienteWhereInput = {}
 
     if (brechoId) where.brechoId = brechoId
 

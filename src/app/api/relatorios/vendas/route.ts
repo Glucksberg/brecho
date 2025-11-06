@@ -3,6 +3,34 @@ import { prisma } from '@/lib/prisma'
 import { successResponse, errorResponse, handleApiError } from '@/lib/api-helpers'
 import { startOfDay, endOfDay } from 'date-fns'
 
+interface VendaDia {
+  data: Date
+  total: number
+  quantidade: number
+}
+
+interface VendaFormaPagamento {
+  tipo: string
+  total: number
+  quantidade: number
+  percentual: number
+}
+
+interface VendaVendedor {
+  vendedorId: string
+  vendedorNome: string
+  total: number
+  quantidade: number
+  comissao: number
+}
+
+interface ProdutoVendido {
+  produtoId: string
+  produtoNome: string
+  quantidade: number
+  total: number
+}
+
 /**
  * GET /api/relatorios/vendas
  * Relatório de vendas com período
@@ -63,20 +91,20 @@ export async function GET(request: NextRequest) {
       acc[dia].total += venda.valorTotal
       acc[dia].quantidade += 1
       return acc
-    }, {} as Record<string, any>)
+    }, {} as Record<string, VendaDia>)
 
     // Vendas por forma de pagamento
     const vendasPorFormaPagamento = vendas.reduce((acc, venda) => {
-      const tipo = venda.tipoPagamento
+      const tipo = venda.metodoPagamento || 'OUTROS'
       if (!acc[tipo]) {
         acc[tipo] = { tipo, total: 0, quantidade: 0, percentual: 0 }
       }
       acc[tipo].total += venda.valorTotal
       acc[tipo].quantidade += 1
       return acc
-    }, {} as Record<string, any>)
+    }, {} as Record<string, VendaFormaPagamento>)
 
-    Object.values(vendasPorFormaPagamento).forEach((item: any) => {
+    Object.values(vendasPorFormaPagamento).forEach((item) => {
       item.percentual = (item.total / totalVendas) * 100
     })
 
@@ -98,7 +126,7 @@ export async function GET(request: NextRequest) {
       acc[vendedorId].quantidade += 1
       // TODO: Calculate commission based on vendedor.comissao
       return acc
-    }, {} as Record<string, any>)
+    }, {} as Record<string, VendaVendedor>)
 
     // Produtos mais vendidos
     const produtosVendidos = vendas.flatMap(v => v.itens)
@@ -113,9 +141,9 @@ export async function GET(request: NextRequest) {
         }
       }
       acc[produtoId].quantidade += item.quantidade
-      acc[produtoId].total += item.total
+      acc[produtoId].total += item.subtotal
       return acc
-    }, {} as Record<string, any>)
+    }, {} as Record<string, ProdutoVendido>)
 
     const relatorio = {
       periodo: { inicio, fim },
@@ -126,7 +154,7 @@ export async function GET(request: NextRequest) {
       vendasPorFormaPagamento: Object.values(vendasPorFormaPagamento),
       vendasPorVendedor: Object.values(vendasPorVendedor),
       produtosMaisVendidos: Object.values(produtosMaisVendidos)
-        .sort((a: any, b: any) => b.quantidade - a.quantidade)
+        .sort((a, b) => b.quantidade - a.quantidade)
         .slice(0, 10)
     }
 
