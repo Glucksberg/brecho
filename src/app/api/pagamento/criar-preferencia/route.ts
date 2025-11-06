@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createCheckoutPreference, isConfigured, MercadoPagoItem } from '@/lib/mercadopago'
+import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
 
 const itemSchema = z.object({
-  id: z.string(),
+  id: z.string(), // produto ID
   nome: z.string(),
   preco: z.number().positive(),
   quantidade: z.number().int().positive(),
@@ -11,6 +12,8 @@ const itemSchema = z.object({
 })
 
 const criarPreferenciaSchema = z.object({
+  brechoId: z.string(),
+  clienteId: z.string().optional(),
   items: z.array(itemSchema).min(1, 'Carrinho vazio'),
   payer: z.object({
     nome: z.string().optional(),
@@ -64,6 +67,7 @@ export async function POST(request: NextRequest) {
     // Calculate totals
     const totalItems = mpItems.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0)
     const shippingCost = validated.shipment?.custo || (totalItems >= 200 ? 0 : 15.00)
+    const valorTotal = totalItems + shippingCost
 
     // Add shipping as item if > 0
     if (shippingCost > 0) {
@@ -77,9 +81,44 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Create preference
+    // Create pending venda in database
+    const venda = await prisma.$transaction(async (tx) => {
+      // Create venda with PENDENTE_PAGAMENTO status
+      const novaVenda = await tx.venda.create({
+        data: {
+          brechoId: validated.brechoId,
+          clienteId: validated.clienteId,
+          origem: 'ONLINE',
+          status: 'PENDENTE_PAGAMENTO',
+          valorTotal,
+          valorFrete: shippingCost,
+          metodoPagamento: 'MERCADO_PAGO',
+          dataVenda: new Date(),
+          enderecoEntrega: validated.shipment?.endereco || {},
+          // Don't set mercadoPagoPaymentId yet - will be set by webhook
+        }
+      })
+
+      // Create venda items
+      for (const item of validated.items) {
+        await tx.itemVenda.create({
+          data: {
+            vendaId: novaVenda.id,
+            produtoId: item.id,
+            quantidade: item.quantidade,
+            precoUnitario: item.preco,
+            subtotal: item.preco * item.quantidade
+          }
+        })
+      }
+
+      return novaVenda
+    })
+
+    // Create preference with venda reference
     const preference = await createCheckoutPreference({
       items: mpItems,
+      external_reference: venda.id, // Use venda ID as external reference
       payer: validated.payer ? {
         name: validated.payer.nome,
         surname: validated.payer.sobrenome,
@@ -116,6 +155,7 @@ export async function POST(request: NextRequest) {
         installments: 3 // Máximo de 3 parcelas sem juros
       },
       metadata: {
+        venda_id: venda.id, // Store venda ID in metadata as well
         timestamp: new Date().toISOString(),
         items_count: validated.items.length,
         shipping_cost: shippingCost
@@ -125,7 +165,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       preferenceId: preference.id,
       initPoint: preference.init_point,
-      sandboxInitPoint: preference.sandbox_init_point
+      sandboxInitPoint: preference.sandbox_init_point,
+      vendaId: venda.id // Return venda ID for tracking
     })
   } catch (error: any) {
     console.error('Erro ao criar preferência:', error)

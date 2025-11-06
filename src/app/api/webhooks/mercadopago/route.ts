@@ -111,6 +111,12 @@ async function handleApprovedPayment(paymentInfo: any) {
   console.log('💚 Payment APPROVED:', paymentInfo.id)
 
   const paymentId = paymentInfo.id.toString()
+  const vendaId = paymentInfo.external_reference
+
+  if (!vendaId) {
+    console.error('❌ No external_reference (venda ID) found in payment')
+    return
+  }
 
   // IDEMPOTENCY CHECK: Verify if this payment was already processed
   const vendaExistente = await prisma.venda.findUnique({
@@ -122,59 +128,144 @@ async function handleApprovedPayment(paymentInfo: any) {
     console.log('   Existing sale ID:', vendaExistente.id)
 
     // If status changed, update it
-    if (vendaExistente.mercadoPagoStatus !== paymentInfo.status) {
+    if (vendaExistente.status !== 'FINALIZADA') {
       await prisma.venda.update({
         where: { id: vendaExistente.id },
-        data: { mercadoPagoStatus: paymentInfo.status }
+        data: {
+          status: 'FINALIZADA',
+          mercadoPagoStatus: paymentInfo.status,
+          dataAtualizacao: new Date()
+        }
       })
-      console.log('   Status updated to:', paymentInfo.status)
+      console.log('   Status updated to FINALIZADA')
     }
 
     return // Don't process again
   }
 
-  // TODO: Create sale in database using transaction
-  // IMPORTANT: Use prisma.$transaction to ensure atomicity
-  // const venda = await prisma.$transaction(async (tx) => {
-  //   // 1. Create venda
-  //   const novaVenda = await tx.venda.create({
-  //     data: {
-  //       brechoId: 'BRECHO_ID',
-  //       clienteId: 'CLIENT_ID',
-  //       vendedorId: 'SELLER_ID',
-  //       formaPagamento: mapPaymentMethod(paymentInfo.payment_method_id),
-  //       subtotal: paymentInfo.transaction_amount,
-  //       total: paymentInfo.transaction_amount,
-  //       origem: 'ONLINE',
-  //       status: 'PAGO',
-  //       mercadoPagoPaymentId: paymentId,
-  //       mercadoPagoStatus: paymentInfo.status,
-  //       mercadoPagoPreferenceId: paymentInfo.preference_id
-  //     }
-  //   })
-  //
-  //   // 2. Create venda items and update product stock
-  //   // for (const item of items) {
-  //   //   await tx.itemVenda.create({ ... })
-  //   //   await tx.produto.update({
-  //   //     where: { id: item.id },
-  //   //     data: { vendido: true, estoque: { decrement: item.quantidade } }
-  //   //   })
-  //   // }
-  //
-  //   return novaVenda
-  // })
+  console.log('Processing approved payment for venda:', vendaId)
 
-  // TODO: Send confirmation email
-  // TODO: Trigger order fulfillment
+  // Process payment and finalize sale
+  await prisma.$transaction(async (tx) => {
+    // 1. Get pending venda with items
+    const venda = await tx.venda.findUnique({
+      where: { id: vendaId },
+      include: {
+        items: {
+          include: {
+            produto: {
+              include: {
+                fornecedora: true
+              }
+            }
+          }
+        },
+        cliente: true,
+        brecho: true
+      }
+    })
 
-  console.log('✅ Venda criada e estoque atualizado')
+    if (!venda) {
+      throw new Error(`Venda not found: ${vendaId}`)
+    }
+
+    if (venda.status !== 'PENDENTE_PAGAMENTO') {
+      console.warn(`⚠️  Venda ${vendaId} already processed with status: ${venda.status}`)
+      return
+    }
+
+    console.log(`   Processing ${venda.items.length} items...`)
+
+    // 2. Update venda to FINALIZADA
+    await tx.venda.update({
+      where: { id: vendaId },
+      data: {
+        mercadoPagoPaymentId: paymentId,
+        mercadoPagoStatus: paymentInfo.status,
+        status: 'FINALIZADA',
+        dataVenda: new Date(paymentInfo.date_approved || paymentInfo.date_created),
+        dataAtualizacao: new Date()
+      }
+    })
+
+    // 3. Update product stock and create créditos
+    for (const item of venda.items) {
+      const produto = item.produto
+
+      // Update product stock
+      await tx.produto.update({
+        where: { id: produto.id },
+        data: {
+          vendido: true,
+          estoque: Math.max(0, produto.estoque - item.quantidade)
+        }
+      })
+
+      console.log(`   ✓ Product ${produto.nome} marked as sold`)
+
+      // Create crédito for consignment products
+      if (produto.tipo === 'CONSIGNADO' && produto.fornecedoraId && produto.fornecedora) {
+        const valorCredito = item.subtotal * (produto.fornecedora.percentualRepasse / 100)
+
+        await tx.credito.create({
+          data: {
+            fornecedoraId: produto.fornecedoraId,
+            vendaId: venda.id,
+            valor: valorCredito,
+            tipo: 'CREDITO',
+            descricao: `Venda do produto ${produto.nome}`,
+            dataCredito: new Date()
+          }
+        })
+
+        console.log(`   ✓ Credit created for ${produto.fornecedora.nome}: R$ ${valorCredito.toFixed(2)}`)
+      }
+    }
+
+    // 4. Send confirmation email
+    try {
+      const { sendOrderConfirmationEmail } = await import('@/lib/email')
+
+      const customerEmail = venda.cliente?.email || paymentInfo.payer?.email
+      if (customerEmail) {
+        await sendOrderConfirmationEmail({
+          email: customerEmail,
+          customerName: venda.cliente?.nome || paymentInfo.payer?.first_name || 'Cliente',
+          orderNumber: venda.id,
+          orderDate: venda.dataVenda,
+          items: venda.items.map(item => ({
+            name: item.produto.nome,
+            quantity: item.quantidade,
+            price: item.precoUnitario,
+            image: item.produto.imagemPrincipal || undefined
+          })),
+          subtotal: venda.valorTotal - (venda.valorFrete || 0),
+          shipping: venda.valorFrete || 0,
+          total: venda.valorTotal,
+          shippingAddress: venda.enderecoEntrega as any
+        })
+
+        console.log('   ✓ Confirmation email sent to:', customerEmail)
+      }
+    } catch (emailError) {
+      console.error('   ⚠️  Error sending confirmation email:', emailError)
+      // Don't fail the transaction if email fails
+    }
+  })
+
+  console.log('✅ Sale finalized and stock updated successfully')
 }
 
 async function handlePendingPayment(paymentInfo: any) {
   console.log('⏳ Payment PENDING:', paymentInfo.id)
 
   const paymentId = paymentInfo.id.toString()
+  const vendaId = paymentInfo.external_reference
+
+  if (!vendaId) {
+    console.error('❌ No external_reference (venda ID) found in payment')
+    return
+  }
 
   // IDEMPOTENCY CHECK: Verify if this payment was already processed
   const vendaExistente = await prisma.venda.findUnique({
@@ -189,26 +280,34 @@ async function handlePendingPayment(paymentInfo: any) {
       await prisma.venda.update({
         where: { id: vendaExistente.id },
         data: {
-          status: 'PENDENTE',
-          mercadoPagoStatus: paymentInfo.status
+          mercadoPagoStatus: paymentInfo.status,
+          dataAtualizacao: new Date()
         }
       })
-      console.log('   Status updated to PENDING')
+      console.log('   Status updated')
     }
 
     return // Don't process again
   }
 
-  // TODO: Create sale with PENDING status
-  // TODO: Send pending payment email
+  // Update venda with payment ID (but keep status as PENDENTE_PAGAMENTO)
+  await prisma.venda.update({
+    where: { id: vendaId },
+    data: {
+      mercadoPagoPaymentId: paymentId,
+      mercadoPagoStatus: paymentInfo.status,
+      dataAtualizacao: new Date()
+    }
+  })
 
-  console.log('⚠️  Venda registrada como pendente')
+  console.log('⚠️  Venda aguardando confirmação de pagamento')
 }
 
 async function handleRejectedPayment(paymentInfo: any) {
   console.log('❌ Payment REJECTED:', paymentInfo.id)
 
   const paymentId = paymentInfo.id.toString()
+  const vendaId = paymentInfo.external_reference
 
   // IDEMPOTENCY CHECK: Find existing sale
   const vendaExistente = await prisma.venda.findUnique({
@@ -224,19 +323,31 @@ async function handleRejectedPayment(paymentInfo: any) {
         where: { id: vendaExistente.id },
         data: {
           status: 'CANCELADO',
-          mercadoPagoStatus: paymentInfo.status
+          mercadoPagoStatus: paymentInfo.status,
+          dataAtualizacao: new Date()
         }
       })
       console.log('   Sale marked as CANCELLED')
-
-      // TODO: Restore product stock if it was already reserved
     }
 
     return
   }
 
-  // If no sale exists yet, just log it (it may never be created)
-  console.log('⚠️  Pagamento recusado (nenhuma venda criada)')
+  // If we have venda ID, mark it as cancelled
+  if (vendaId) {
+    await prisma.venda.update({
+      where: { id: vendaId },
+      data: {
+        mercadoPagoPaymentId: paymentId,
+        mercadoPagoStatus: paymentInfo.status,
+        status: 'CANCELADO',
+        dataAtualizacao: new Date()
+      }
+    })
+    console.log('   Pending sale marked as CANCELLED')
+  } else {
+    console.log('⚠️  Payment rejected (no venda reference)')
+  }
 }
 
 async function handleRefundedPayment(paymentInfo: any) {
@@ -246,7 +357,14 @@ async function handleRefundedPayment(paymentInfo: any) {
 
   // IDEMPOTENCY CHECK: Find existing sale
   const vendaExistente = await prisma.venda.findUnique({
-    where: { mercadoPagoPaymentId: paymentId }
+    where: { mercadoPagoPaymentId: paymentId },
+    include: {
+      items: {
+        include: {
+          produto: true
+        }
+      }
+    }
   })
 
   if (!vendaExistente) {
@@ -256,24 +374,39 @@ async function handleRefundedPayment(paymentInfo: any) {
 
   console.log('   Found sale:', vendaExistente.id)
 
-  // Update status to ESTORNADO (only if not already updated)
+  // Update status to ESTORNADO and restore stock (only if not already updated)
   if (vendaExistente.status !== 'ESTORNADO') {
-    await prisma.venda.update({
-      where: { id: vendaExistente.id },
-      data: {
-        status: 'ESTORNADO',
-        mercadoPagoStatus: paymentInfo.status
+    await prisma.$transaction(async (tx) => {
+      // Update venda status
+      await tx.venda.update({
+        where: { id: vendaExistente.id },
+        data: {
+          status: 'ESTORNADO',
+          mercadoPagoStatus: paymentInfo.status,
+          dataAtualizacao: new Date()
+        }
+      })
+
+      // Restore product stock
+      for (const item of vendaExistente.items) {
+        await tx.produto.update({
+          where: { id: item.produtoId },
+          data: {
+            vendido: false,
+            estoque: { increment: item.quantidade }
+          }
+        })
+
+        console.log(`   ✓ Stock restored for ${item.produto.nome}`)
       }
     })
-    console.log('   Sale marked as REFUNDED')
 
-    // TODO: Restore product stock
-    // TODO: Send refund confirmation email
+    console.log('   Sale marked as REFUNDED and stock restored')
   } else {
     console.log('   Sale already marked as REFUNDED (idempotent)')
   }
 
-  console.log('↩️  Venda estornada e estoque restaurado')
+  console.log('↩️  Refund processed successfully')
 }
 
 // Helper to map Mercado Pago payment methods to our enum
