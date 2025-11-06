@@ -1,13 +1,15 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import { signIn } from 'next-auth/react'
 import { Input, Button, Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui'
 import { Mail, Lock } from 'lucide-react'
 
 export default function LoginPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState({
     email: '',
@@ -21,22 +23,21 @@ export default function LoginPage() {
     setLoading(true)
 
     try {
-      // TODO: Implement NextAuth signIn
-      // const result = await signIn('credentials', {
-      //   email: formData.email,
-      //   password: formData.password,
-      //   redirect: false
-      // })
+      const result = await signIn('credentials', {
+        email: formData.email,
+        password: formData.password,
+        redirect: false
+      })
 
-      // if (result?.error) {
-      //   setError('Email ou senha inválidos')
-      //   return
-      // }
+      if (result?.error) {
+        setError('Email ou senha inválidos')
+        return
+      }
 
-      // Temporary: Redirect to dashboard
-      setTimeout(() => {
-        router.push('/dashboard')
-      }, 1000)
+      // Success - redirect to callback URL or dashboard
+      const callbackUrl = searchParams.get('callbackUrl') || '/dashboard'
+      router.push(callbackUrl)
+      router.refresh()
     } catch (err) {
       setError('Erro ao fazer login. Tente novamente.')
     } finally {

@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { getServerSession, requireAuth, requireBrechoAccess } from '@/lib/auth'
 import {
   successResponse,
   errorResponse,
@@ -15,6 +16,9 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
+    // Require authentication
+    await requireAuth()
+
     const venda = await prisma.venda.findUnique({
       where: { id: params.id },
       include: {
@@ -39,6 +43,9 @@ export async function GET(
       return errorResponse('Venda não encontrada', 404)
     }
 
+    // Check if user has access to this brecho
+    await requireBrechoAccess(venda.brechoId)
+
     return successResponse(venda)
   } catch (error) {
     return handleApiError(error)
@@ -54,7 +61,8 @@ export async function PUT(
   { params }: { params: { id: string } }
 ) {
   try {
-    // TODO: Add authorization check
+    // Require authentication and admin permissions
+    await requireAuth()
 
     const venda = await prisma.$transaction(async (tx) => {
       const vendaAtual = await tx.venda.findUnique({

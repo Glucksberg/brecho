@@ -1,37 +1,72 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
+import { getServerSession } from '@/lib/auth'
 
 export async function GET(request: NextRequest) {
   try {
-    // TODO: Get from authenticated user's orders
-    // For now, return mock data from server
-    const pedidos = [
-      {
-        id: '1',
-        numero: '#001234',
-        data: '2024-01-15',
-        status: 'ENTREGUE',
-        total: 349.80,
-        itens: 3
-      },
-      {
-        id: '2',
-        numero: '#001235',
-        data: '2024-01-10',
-        status: 'EM_TRANSITO',
-        total: 189.90,
-        itens: 1
-      },
-      {
-        id: '3',
-        numero: '#001236',
-        data: '2024-01-05',
-        status: 'PROCESSANDO',
-        total: 279.70,
-        itens: 2
+    // Get authenticated user session
+    const session = await getServerSession()
+
+    if (!session || !session.user) {
+      return NextResponse.json(
+        { error: 'Não autenticado' },
+        { status: 401 }
+      )
+    }
+
+    // Get user's cliente record
+    const cliente = await prisma.cliente.findFirst({
+      where: {
+        email: session.user.email
       }
-    ]
+    })
+
+    if (!cliente) {
+      // User has no cliente record yet - return empty orders
+      return NextResponse.json({ pedidos: [] })
+    }
+
+    // Fetch real orders from database
+    const vendas = await prisma.venda.findMany({
+      where: {
+        clienteId: cliente.id,
+        origem: 'ONLINE'
+      },
+      orderBy: {
+        dataVenda: 'desc'
+      },
+      include: {
+        items: {
+          include: {
+            produto: {
+              select: {
+                id: true,
+                nome: true,
+                preco: true,
+                imagemPrincipal: true
+              }
+            }
+          }
+        }
+      }
+    })
+
+    // Format orders for response
+    const pedidos = vendas.map(venda => ({
+      id: venda.id,
+      numero: `#${venda.id.substring(0, 6).toUpperCase()}`,
+      data: venda.dataVenda.toISOString().split('T')[0],
+      status: venda.status,
+      total: venda.valorTotal,
+      itens: venda.items.length,
+      items: venda.items.map(item => ({
+        id: item.id,
+        produto: item.produto,
+        quantidade: item.quantidade,
+        preco: item.precoUnitario
+      }))
+    }))
 
     return NextResponse.json({ pedidos })
   } catch (error: any) {
