@@ -1,0 +1,697 @@
+// Prisma Schema - Retrô Carólis
+// Next.js 14 + TypeScript + PostgreSQL
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql" // ou "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// MULTI-TENANT
+// ============================================
+
+model Brecho {
+  id        String   @id @default(cuid())
+  nome      String
+  slug      String   @unique // retrocarolis, outrobrecho
+  dominio   String?  @unique // retrocarolis.com
+  ativo     Boolean  @default(true)
+
+  // Configurações
+  logo      String?
+  cor       String   @default("#8B5CF6") // Cor primária
+  email     String?
+  telefone  String?
+  endereco  Json? // { rua, numero, cidade, estado, cep }
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relações
+  users         User[]
+  produtos      Produto[]
+  vendas        Venda[]
+  clientes      Cliente[]
+  fornecedoras  Fornecedora[]
+  despesas      Despesa[]
+  caixas        Caixa[]
+  trocas        Troca[]
+
+  @@index([slug])
+  @@map("brechos")
+}
+
+// ============================================
+// AUTENTICAÇÃO E USUÁRIOS
+// ============================================
+
+enum UserRole {
+  ADMIN      // Super usuário
+  DONO       // Proprietário do brechó
+  VENDEDOR   // Funcionário
+  FORNECEDOR // Acesso ao portal
+  CLIENTE    // Cliente comum
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  password      String? // Hashed
+
+  // Tipo e permissões
+  role          UserRole  @default(CLIENTE)
+  permissoes    String[] // Permissões customizadas
+
+  // Multi-tenant
+  brechoId      String?
+  brecho        Brecho?   @relation(fields: [brechoId], references: [id])
+
+  // Para vendedores
+  comissao      Float     @default(0) // %
+  metaMensal    Float     @default(0)
+
+  // Para fornecedores
+  fornecedoraId String?   @unique
+  fornecedora   Fornecedora? @relation(fields: [fornecedoraId], references: [id])
+
+  // Status
+  ativo         Boolean   @default(true)
+
+  // Timestamps
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relações NextAuth
+  accounts      Account[]
+  sessions      Session[]
+
+  // Relações do sistema
+  vendas        Venda[]   @relation("vendedor")
+  caixas        Caixa[]
+  trocasAnalisadas Troca[] @relation("analisadoPor")
+
+  @@index([email])
+  @@index([brechoId])
+  @@index([role])
+  @@map("users")
+}
+
+// NextAuth tables
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// ============================================
+// FORNECEDORAS (CONSIGNAÇÃO)
+// ============================================
+
+model Fornecedora {
+  id                 String   @id @default(cuid())
+
+  // Dados pessoais
+  nome               String
+  cpf                String?
+  email              String?
+  telefone           String
+  endereco           Json? // { rua, numero, complemento, bairro, cidade, estado, cep }
+
+  // Consignação
+  percentualRepasse  Float    @default(60) // % que a fornecedora recebe
+
+  // Dados bancários
+  dadosBancarios     Json? // { banco, agencia, conta, tipoConta, pix }
+
+  // Status
+  ativo              Boolean  @default(true)
+  observacoes        String?
+
+  // Multi-tenant
+  brechoId           String
+  brecho             Brecho   @relation(fields: [brechoId], references: [id])
+
+  // Timestamps
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  // Relações
+  user               User? // Usuário vinculado (fornecedor)
+  produtos           Produto[]
+  creditos           Credito[]
+
+  @@index([brechoId])
+  @@index([ativo])
+  @@map("fornecedoras")
+}
+
+// ============================================
+// CRÉDITOS (REPASSES)
+// ============================================
+
+enum CreditoStatus {
+  PENDENTE   // Aguardando 30 dias
+  LIBERADO   // Disponível para uso
+  UTILIZADO  // Usado em produtos
+  PAGO       // Pago em dinheiro
+}
+
+enum TipoUtilizacao {
+  DINHEIRO
+  PRODUTOS
+}
+
+model Credito {
+  id                 String           @id @default(cuid())
+
+  // Fornecedora
+  fornecedoraId      String
+  fornecedora        Fornecedora      @relation(fields: [fornecedoraId], references: [id])
+
+  // Venda origem
+  vendaId            String
+  venda              Venda            @relation(fields: [vendaId], references: [id])
+
+  // Produto vendido
+  produtoId          String
+
+  // Valores
+  valorVenda         Float // Preço que o produto foi vendido
+  percentualRepasse  Float // % da fornecedora no momento da venda
+  valorCredito       Float // Valor do crédito gerado
+
+  // Status
+  status             CreditoStatus    @default(PENDENTE)
+  tipoUtilizacao     TipoUtilizacao?
+
+  // Datas
+  dataVenda          DateTime
+  dataLiberacao      DateTime? // 30 dias após venda
+  dataUtilizacao     DateTime?
+  dataPagamento      DateTime?
+
+  observacoes        String?
+
+  // Timestamps
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  @@index([fornecedoraId])
+  @@index([vendaId])
+  @@index([status])
+  @@map("creditos")
+}
+
+// ============================================
+// PRODUTOS
+// ============================================
+
+enum TipoProduto {
+  PROPRIO     // Produto próprio do brechó
+  CONSIGNADO  // Produto de fornecedora
+}
+
+enum CondicaoProduto {
+  NOVO
+  SEMINOVO
+  USADO
+}
+
+enum GeneroProduto {
+  MASCULINO
+  FEMININO
+  UNISSEX
+  INFANTIL
+}
+
+model Produto {
+  id              String           @id @default(cuid())
+
+  // Informações básicas
+  nome            String
+  descricao       String?
+  slug            String // URL-friendly
+  sku             String?          @unique // Código interno
+  codigoBarras    String?          @unique // EAN-13
+
+  // Preços
+  preco           Float
+  precoOriginal   Float? // Para produtos em promoção
+
+  // Classificação
+  categoria       String
+  subcategoria    String?
+  marca           String?
+  tamanho         String?
+  cor             String?
+  condicao        CondicaoProduto  @default(USADO)
+  genero          GeneroProduto?
+  tags            String[]
+
+  // Consignação
+  tipo            TipoProduto      @default(PROPRIO)
+  fornecedoraId   String?
+  fornecedora     Fornecedora?     @relation(fields: [fornecedoraId], references: [id])
+
+  // Imagens
+  imagens         String[] // URLs
+  imagemPrincipal String?
+
+  // Estoque
+  estoque         Int              @default(1)
+  vendido         Boolean          @default(false)
+  dataVenda       DateTime?
+
+  // Status
+  ativo           Boolean          @default(true)
+  destaque        Boolean          @default(false)
+
+  // Dimensões e peso (para frete)
+  peso            Float? // em gramas
+  dimensoes       Json? // { altura, largura, profundidade }
+
+  // Multi-tenant
+  brechoId        String
+  brecho          Brecho           @relation(fields: [brechoId], references: [id])
+
+  // Timestamps
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  // Relações
+  itensVenda      ItemVenda[]
+
+  @@index([brechoId])
+  @@index([slug])
+  @@index([tipo])
+  @@index([fornecedoraId])
+  @@index([categoria])
+  @@index([ativo])
+  @@index([vendido])
+  @@map("produtos")
+}
+
+// ============================================
+// CLIENTES
+// ============================================
+
+model Cliente {
+  id             String   @id @default(cuid())
+
+  // Dados pessoais
+  nome           String
+  email          String?
+  telefone       String?
+  cpf            String?
+  dataNascimento DateTime?
+  genero         String? // masculino, feminino, outro
+
+  // Endereço
+  endereco       Json? // { rua, numero, complemento, bairro, cidade, estado, cep }
+
+  // Estatísticas
+  totalCompras   Float    @default(0)
+  numeroCompras  Int      @default(0)
+  ultimaCompra   DateTime?
+
+  // Status
+  ativo          Boolean  @default(true)
+  observacoes    String?
+
+  // Multi-tenant
+  brechoId       String
+  brecho         Brecho   @relation(fields: [brechoId], references: [id])
+
+  // Timestamps
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relações
+  vendas         Venda[]
+  trocas         Troca[]
+
+  @@index([brechoId])
+  @@index([email])
+  @@map("clientes")
+}
+
+// ============================================
+// VENDAS
+// ============================================
+
+enum StatusVenda {
+  PENDENTE
+  PAGO
+  CANCELADO
+  ESTORNADO
+}
+
+enum OrigemVenda {
+  ONLINE
+  PRESENCIAL
+}
+
+enum FormaPagamento {
+  DINHEIRO
+  CARTAO
+  PIX
+  TRANSFERENCIA
+}
+
+model Venda {
+  id              String         @id @default(cuid())
+  numeroVenda     String         @unique
+
+  // Cliente
+  clienteId       String
+  cliente         Cliente        @relation(fields: [clienteId], references: [id])
+
+  // Vendedor
+  vendedorId      String
+  vendedor        User           @relation("vendedor", fields: [vendedorId], references: [id])
+
+  // Itens
+  itens           ItemVenda[]
+
+  // Valores
+  subtotal        Float
+  desconto        Float          @default(0)
+  taxaEntrega     Float          @default(0)
+  total           Float
+
+  // Pagamento
+  formaPagamento  FormaPagamento
+  status          StatusVenda    @default(PENDENTE)
+
+  // Origem
+  origem          OrigemVenda    @default(PRESENCIAL)
+
+  // Entrega (para online)
+  enderecoEntrega Json?
+
+  // Cupom
+  cupomDesconto   String?
+
+  // Datas
+  dataVenda       DateTime       @default(now())
+  dataPagamento   DateTime?
+
+  observacoes     String?
+
+  // Multi-tenant
+  brechoId        String
+  brecho          Brecho         @relation(fields: [brechoId], references: [id])
+
+  // Timestamps
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  // Relações
+  creditos        Credito[]
+  trocas          Troca[]
+
+  @@index([brechoId])
+  @@index([clienteId])
+  @@index([vendedorId])
+  @@index([status])
+  @@index([origem])
+  @@index([dataVenda])
+  @@map("vendas")
+}
+
+model ItemVenda {
+  id             String  @id @default(cuid())
+
+  vendaId        String
+  venda          Venda   @relation(fields: [vendaId], references: [id], onDelete: Cascade)
+
+  produtoId      String
+  produto        Produto @relation(fields: [produtoId], references: [id])
+
+  quantidade     Int     @default(1)
+  precoUnitario  Float
+  subtotal       Float
+
+  @@index([vendaId])
+  @@index([produtoId])
+  @@map("itens_venda")
+}
+
+// ============================================
+// CAIXA
+// ============================================
+
+enum StatusCaixa {
+  ABERTO
+  FECHADO
+}
+
+model Caixa {
+  id                String       @id @default(cuid())
+
+  // Operador
+  operadorId        String
+  operador          User         @relation(fields: [operadorId], references: [id])
+
+  // Status
+  status            StatusCaixa  @default(ABERTO)
+
+  // Abertura
+  dataAbertura      DateTime     @default(now())
+  saldoInicial      Float
+
+  // Fechamento
+  dataFechamento    DateTime?
+  saldoEsperado     Float        @default(0)
+  saldoInformado    Float        @default(0)
+  diferenca         Float        @default(0)
+
+  // Totais
+  totalVendas       Float        @default(0)
+  totalDespesas     Float        @default(0)
+  totalSangrias     Float        @default(0)
+  totalReforcos     Float        @default(0)
+
+  // Por forma de pagamento
+  vendasDinheiro    Float        @default(0)
+  vendasCartao      Float        @default(0)
+  vendasPix         Float        @default(0)
+  vendasTransferencia Float      @default(0)
+
+  // Movimentações detalhadas
+  movimentacoes     Json[] // Array de { tipo, valor, descricao, data }
+
+  observacoes       String?
+
+  // Multi-tenant
+  brechoId          String
+  brecho            Brecho       @relation(fields: [brechoId], references: [id])
+
+  // Timestamps
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  @@index([brechoId])
+  @@index([operadorId])
+  @@index([status])
+  @@index([dataAbertura])
+  @@map("caixas")
+}
+
+// ============================================
+// TROCAS E DEVOLUÇÕES
+// ============================================
+
+enum TipoTroca {
+  TROCA
+  DEVOLUCAO
+}
+
+enum MotivoTroca {
+  DEFEITO
+  SEM_DEFEITO
+  DESISTENCIA // CDC (online)
+}
+
+enum StatusTroca {
+  SOLICITADO
+  APROVADO
+  RECUSADO
+  CONCLUIDO
+  CANCELADO
+}
+
+model Troca {
+  id                  String       @id @default(cuid())
+
+  // Venda original
+  vendaId             String
+  venda               Venda        @relation(fields: [vendaId], references: [id])
+
+  // Cliente
+  clienteId           String
+  cliente             Cliente      @relation(fields: [clienteId], references: [id])
+
+  // Tipo e motivo
+  tipo                TipoTroca
+  origem              OrigemVenda // online ou presencial
+  motivo              MotivoTroca
+  descricaoMotivo     String?
+
+  // Produto original
+  produtoOriginalId   String
+  valorProdutoOriginal Float
+
+  // Produto novo (em caso de troca)
+  produtoNovoId       String?
+  valorProdutoNovo    Float?
+
+  // Valores
+  valorDiferenca      Float        @default(0) // + cliente recebe, - cliente paga
+  valorEstornado      Float        @default(0) // Em caso de devolução
+
+  // Status
+  status              StatusTroca  @default(SOLICITADO)
+
+  // Datas
+  dataSolicitacao     DateTime     @default(now())
+  dataAprovacao       DateTime?
+  dataConclusao       DateTime?
+  prazoLimite         DateTime? // 7 dias CDC para online
+
+  // Frete (devoluções online)
+  freteDevolvido      Boolean      @default(false)
+  valorFrete          Float?
+  codigoRastreio      String?
+
+  // Análise
+  analisadoPorId      String?
+  analisadoPor        User?        @relation("analisadoPor", fields: [analisadoPorId], references: [id])
+  observacoes         String?
+
+  // Multi-tenant
+  brechoId            String
+  brecho              Brecho       @relation(fields: [brechoId], references: [id])
+
+  // Timestamps
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  @@index([brechoId])
+  @@index([vendaId])
+  @@index([clienteId])
+  @@index([status])
+  @@index([origem])
+  @@map("trocas")
+}
+
+// ============================================
+// DESPESAS
+// ============================================
+
+enum CategoriaDespesa {
+  OPERACIONAL
+  MARKETING
+  PESSOAL
+  PRODUTO
+  OUTROS
+}
+
+enum StatusDespesa {
+  PENDENTE
+  PAGO
+  VENCIDO
+  CANCELADO
+}
+
+model Despesa {
+  id                    String           @id @default(cuid())
+
+  // Descrição
+  descricao             String
+  categoria             CategoriaDespesa
+  subcategoria          String?
+
+  // Valores
+  valor                 Float
+
+  // Datas
+  dataVencimento        DateTime?
+  dataPagamento         DateTime?
+
+  // Status
+  status                StatusDespesa    @default(PENDENTE)
+  formaPagamento        FormaPagamento?
+
+  // Fornecedor
+  fornecedor            String?
+  numeroDocumento       String?
+
+  // Recorrência
+  recorrente            Boolean          @default(false)
+  frequenciaRecorrencia String? // mensal, bimestral, trimestral, semestral, anual
+  proximoVencimento     DateTime?
+
+  // Anexos
+  anexos                String[] // URLs
+
+  // Centro de custo
+  centroCusto           String?
+
+  observacoes           String?
+
+  // Multi-tenant
+  brechoId              String
+  brecho                Brecho           @relation(fields: [brechoId], references: [id])
+
+  // Timestamps
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+
+  @@index([brechoId])
+  @@index([status])
+  @@index([categoria])
+  @@index([dataVencimento])
+  @@map("despesas")
+}
