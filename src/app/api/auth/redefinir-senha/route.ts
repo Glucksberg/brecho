@@ -47,7 +47,14 @@ export async function POST(request: NextRequest) {
       message: 'Senha redefinida com sucesso'
     })
   } catch (error: any) {
-    console.error('Erro ao redefinir senha:', error)
+    // Sanitize error before logging (remove password)
+    const sanitizedError = {
+      message: error.message,
+      name: error.name,
+      token: '[REDACTED]'
+    }
+
+    console.error('Erro ao redefinir senha:', sanitizedError)
 
     if (error.name === 'ZodError') {
       return NextResponse.json(

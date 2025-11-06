@@ -22,6 +22,7 @@
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",
     "autoprefixer": "^10.4.19",
+    "bcryptjs": "^2.4.3",
     "date-fns": "^3.6.0",
     "lucide-react": "^0.372.0",
     "mercadopago": "^2.10.0",
@@ -35,6 +36,7 @@
     "zod": "^3.23.6"
   },
   "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
     "prisma": "^5.12.0"
   }
 }

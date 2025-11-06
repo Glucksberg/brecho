@@ -82,7 +82,20 @@ export async function POST(request: NextRequest) {
       user
     })
   } catch (error: any) {
-    console.error('Erro ao criar usuário:', error)
+    // Sanitize error before logging (remove sensitive data)
+    const sanitizedError = error.name === 'ZodError' ? {
+      name: error.name,
+      issues: error.errors?.map((e: any) => ({
+        path: e.path,
+        message: e.message,
+        code: e.code
+      }))
+    } : {
+      message: error.message,
+      name: error.name
+    }
+
+    console.error('Erro ao criar usuário:', sanitizedError)
 
     if (error.name === 'ZodError') {
       return NextResponse.json(
