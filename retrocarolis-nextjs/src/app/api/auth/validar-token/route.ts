@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Find user with valid token
-    const usuario = await prisma.usuario.findFirst({
+    const user = await prisma.user.findFirst({
       where: {
         resetToken: token,
         resetTokenExpiry: {
@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    if (!usuario) {
+    if (!user) {
       return NextResponse.json(
         { error: 'Token inválido ou expirado' },
         { status: 400 }

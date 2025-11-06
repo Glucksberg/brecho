@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
     const { token, senha } = redefinirSenhaSchema.parse(body)
 
     // Find user with valid token
-    const usuario = await prisma.usuario.findFirst({
+    const user = await prisma.user.findFirst({
       where: {
         resetToken: token,
         resetTokenExpiry: {
@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    if (!usuario) {
+    if (!user) {
       return NextResponse.json(
         { error: 'Token inválido ou expirado' },
         { status: 400 }
@@ -31,13 +31,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Hash new password
-    const senhaHash = await hash(senha, 12)
+    const passwordHash = await hash(senha, 12)
 
     // Update password and clear reset token
-    await prisma.usuario.update({
-      where: { id: usuario.id },
+    await prisma.user.update({
+      where: { id: user.id },
       data: {
-        senha: senhaHash,
+        password: passwordHash,
         resetToken: null,
         resetTokenExpiry: null
       }

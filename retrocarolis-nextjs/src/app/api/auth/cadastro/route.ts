@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
     const validated = cadastroSchema.parse(body)
 
     // Check if email already exists
-    const existingUser = await prisma.usuario.findUnique({
+    const existingUser = await prisma.user.findUnique({
       where: { email: validated.email }
     })
 
@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Hash password
-    const senhaHash = await hash(validated.senha, 12)
+    const passwordHash = await hash(validated.senha, 12)
 
     // Get first Brecho (multi-tenant support)
     const brecho = await prisma.brecho.findFirst()
@@ -53,29 +53,29 @@ export async function POST(request: NextRequest) {
     }
 
     // Create user
-    const usuario = await prisma.usuario.create({
+    const user = await prisma.user.create({
       data: {
         brechoId: brecho.id,
-        nome: validated.nome,
+        name: validated.nome,
         email: validated.email,
-        senha: senhaHash,
+        password: passwordHash,
         telefone: validated.telefone,
         cpf: validated.cpf.replace(/\D/g, ''),
-        papel: 'CLIENTE',
-        status: 'ATIVO',
+        role: 'CLIENTE',
+        ativo: true,
         endereco: `${validated.endereco.rua}, ${validated.endereco.numero}${validated.endereco.complemento ? ', ' + validated.endereco.complemento : ''}, ${validated.endereco.bairro}, ${validated.endereco.cidade} - ${validated.endereco.estado}, CEP: ${validated.endereco.cep}`
       },
       select: {
         id: true,
-        nome: true,
+        name: true,
         email: true,
-        papel: true
+        role: true
       }
     })
 
     return NextResponse.json({
       message: 'Usuário criado com sucesso',
-      usuario
+      user
     })
   } catch (error: any) {
     console.error('Erro ao criar usuário:', error)

@@ -1,6 +1,6 @@
 'use client'
 
-import React, { createContext, useContext, useReducer, useEffect } from 'react'
+import React, { createContext, useContext, useReducer, useEffect, useCallback } from 'react'
 
 // Types
 export interface CartItem {
@@ -158,21 +158,21 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   }, [state.items])
 
   // Cart functions
-  const addToCart = (product: Omit<CartItem, 'quantity'>) => {
+  const addToCart = useCallback((product: Omit<CartItem, 'quantity'>) => {
     dispatch({ type: CART_ACTIONS.ADD_ITEM, payload: product })
-  }
+  }, [])
 
-  const removeFromCart = (productId: string) => {
+  const removeFromCart = useCallback((productId: string) => {
     dispatch({ type: CART_ACTIONS.REMOVE_ITEM, payload: { id: productId } })
-  }
+  }, [])
 
-  const updateQuantity = (productId: string, quantity: number) => {
+  const updateQuantity = useCallback((productId: string, quantity: number) => {
     dispatch({ type: CART_ACTIONS.UPDATE_QUANTITY, payload: { id: productId, quantity } })
-  }
+  }, [])
 
-  const clearCart = () => {
+  const clearCart = useCallback(() => {
     dispatch({ type: CART_ACTIONS.CLEAR_CART })
-  }
+  }, [])
 
   // Derived calculations
   const cartCount = state.items.reduce((total, item) => total + item.quantity, 0)
@@ -181,14 +181,14 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     return total + (item.preco || 0) * item.quantity
   }, 0)
 
-  const getItemQuantity = (productId: string) => {
+  const getItemQuantity = useCallback((productId: string) => {
     const item = state.items.find(item => item.id === productId)
     return item ? item.quantity : 0
-  }
+  }, [state.items])
 
-  const isInCart = (productId: string) => {
+  const isInCart = useCallback((productId: string) => {
     return state.items.some(item => item.id === productId)
-  }
+  }, [state.items])
 
   // Context value
   const value: CartContextValue = {

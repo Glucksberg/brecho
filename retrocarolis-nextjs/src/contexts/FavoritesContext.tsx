@@ -1,6 +1,6 @@
 'use client'
 
-import React, { createContext, useContext, useState, useEffect } from 'react'
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
 
 // Types
 export interface FavoriteProduct {
@@ -64,7 +64,7 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
   }, [favorites])
 
   // Add product to favorites
-  const addToFavorites = (product: FavoriteProduct) => {
+  const addToFavorites = useCallback((product: FavoriteProduct) => {
     setFavorites(prev => {
       // Check if already in favorites
       if (prev.some(item => item.id === product.id)) {
@@ -72,15 +72,15 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
       }
       return [...prev, product]
     })
-  }
+  }, [])
 
   // Remove product from favorites
-  const removeFromFavorites = (productId: string) => {
+  const removeFromFavorites = useCallback((productId: string) => {
     setFavorites(prev => prev.filter(item => item.id !== productId))
-  }
+  }, [])
 
   // Toggle favorite (add if doesn't exist, remove if exists)
-  const toggleFavorite = (product: FavoriteProduct) => {
+  const toggleFavorite = useCallback((product: FavoriteProduct) => {
     setFavorites(prev => {
       const exists = prev.some(item => item.id === product.id)
       if (exists) {
@@ -89,17 +89,17 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
         return [...prev, product]
       }
     })
-  }
+  }, [])
 
   // Check if product is in favorites
-  const isFavorite = (productId: string) => {
+  const isFavorite = useCallback((productId: string) => {
     return favorites.some(item => item.id === productId)
-  }
+  }, [favorites])
 
   // Clear all favorites
-  const clearFavorites = () => {
+  const clearFavorites = useCallback(() => {
     setFavorites([])
-  }
+  }, [])
 
   // Count favorites
   const favoritesCount = favorites.length

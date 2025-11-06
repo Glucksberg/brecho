@@ -13,12 +13,12 @@ export async function POST(request: NextRequest) {
     const { email } = esqueciSenhaSchema.parse(body)
 
     // Find user
-    const usuario = await prisma.usuario.findUnique({
+    const user = await prisma.user.findUnique({
       where: { email }
     })
 
     // Always return success to prevent email enumeration
-    if (!usuario) {
+    if (!user) {
       return NextResponse.json({
         message: 'Se o email existe, um link de recuperação foi enviado'
       })
@@ -29,8 +29,8 @@ export async function POST(request: NextRequest) {
     const resetTokenExpiry = new Date(Date.now() + 3600000) // 1 hour
 
     // Save token to database
-    await prisma.usuario.update({
-      where: { id: usuario.id },
+    await prisma.user.update({
+      where: { id: user.id },
       data: {
         resetToken,
         resetTokenExpiry
@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
     const resetLink = `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/redefinir-senha?token=${resetToken}`
 
     console.log('=== PASSWORD RESET LINK ===')
-    console.log(`User: ${usuario.email}`)
+    console.log(`User: ${user.email}`)
     console.log(`Link: ${resetLink}`)
     console.log('===========================')
 

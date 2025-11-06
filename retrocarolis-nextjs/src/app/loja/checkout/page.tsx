@@ -100,8 +100,16 @@ export default function CheckoutPage() {
             imagemPrincipal: item.imagemPrincipal
           })),
           payer: {
-            nome: dadosCliente.nome.split(' ')[0],
-            sobrenome: dadosCliente.nome.split(' ').slice(1).join(' '),
+            nome: (() => {
+              const nameParts = dadosCliente.nome.trim().split(/\s+/)
+              return nameParts[0] || dadosCliente.nome
+            })(),
+            sobrenome: (() => {
+              const nameParts = dadosCliente.nome.trim().split(/\s+/)
+              const lastName = nameParts.slice(1).join(' ')
+              // Use first name as fallback for single-word names (Mercado Pago requirement)
+              return lastName || nameParts[0] || 'N/A'
+            })(),
             email: dadosCliente.email,
             telefone: dadosCliente.telefone,
             cpf: dadosCliente.cpf.replace(/\D/g, '')

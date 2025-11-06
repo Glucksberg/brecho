@@ -70,6 +70,11 @@ model User {
   resetToken       String?   @unique
   resetTokenExpiry DateTime?
 
+  // Dados adicionais para clientes
+  telefone      String?
+  cpf           String?
+  endereco      String? // Endereço completo como string
+
   // Tipo e permissões
   role          UserRole  @default(CLIENTE)
   permissoes    String[] // Permissões customizadas
@@ -398,8 +403,11 @@ enum OrigemVenda {
 
 enum FormaPagamento {
   DINHEIRO
-  CARTAO
+  CARTAO_CREDITO
+  CARTAO_DEBITO
+  CARTAO  // Genérico para compatibilidade
   PIX
+  BOLETO
   TRANSFERENCIA
 }
 
