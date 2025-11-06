@@ -17,3 +17,12 @@ export type { BadgeProps } from './Badge'
 
 export { Select } from './Select'
 export type { SelectProps } from './Select'
+
+export { Modal, ModalFooter } from './Modal'
+export type { ModalProps, ModalFooterProps } from './Modal'
+
+export { Textarea } from './Textarea'
+export type { TextareaProps } from './Textarea'
+
+export { FileUpload } from './FileUpload'
+export type { FileUploadProps } from './FileUpload'
