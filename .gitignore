@@ -2,6 +2,11 @@
 node_modules/
 dist/
 .env
+.env.local
 *.log
 .cache/
 .DS_Store
+
+# Build artifacts
+tsconfig.tsbuildinfo
+*.tsbuildinfo
