@@ -91,6 +91,13 @@ model User {
   fornecedoraId String?   @unique
   fornecedora   Fornecedora? @relation(fields: [fornecedoraId], references: [id])
 
+  // Para clientes que também são vendedores
+  // Permite que um CLIENTE use privilégios de VENDEDOR (descontos, etc)
+  // O DONO pode associar uma conta CLIENTE a uma conta VENDEDOR nas configurações
+  vendedorId    String?
+  vendedorAssociado User? @relation("VendedorCliente", fields: [vendedorId], references: [id])
+  clientesAssociados User[] @relation("VendedorCliente")
+
   // Status
   ativo         Boolean   @default(true)
 
