@@ -74,6 +74,7 @@ export const authOptions: NextAuthOptions = {
           email: user.email,
           role: user.role,
           brechoId: user.brechoId,
+          fornecedoraId: user.fornecedoraId,
           avatar: user.image,
           permissoes: user.permissoes
         }
@@ -99,6 +100,7 @@ export const authOptions: NextAuthOptions = {
         token.id = user.id
         token.role = user.role
         token.brechoId = user.brechoId
+        token.fornecedoraId = user.fornecedoraId
         token.avatar = user.avatar
         token.permissoes = user.permissoes || []
       }
@@ -119,6 +121,7 @@ export const authOptions: NextAuthOptions = {
           email: token.email as string,
           tipo: token.role as UserRole,
           brechoId: token.brechoId as string,
+          fornecedoraId: token.fornecedoraId as string | undefined,
           avatar: token.avatar as string | undefined,
           permissoes: (token.permissoes as string[]) || []
         }

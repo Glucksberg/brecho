@@ -40,6 +40,11 @@ const adminPaths = [
   '/configuracoes',
 ]
 
+// Rotas que requerem ser fornecedora
+const fornecedoraPaths = [
+  '/portal-fornecedora',
+]
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
@@ -73,6 +78,17 @@ export async function middleware(request: NextRequest) {
     if (userRole !== 'ADMIN' && userRole !== 'DONO') {
       // Unauthorized - redirect to dashboard
       return NextResponse.redirect(new URL('/dashboard', request.url))
+    }
+  }
+
+  // Check portal de fornecedora access
+  // CLIENTE com fornecedoraId pode acessar
+  if (fornecedoraPaths.some(path => pathname.startsWith(path))) {
+    const fornecedoraId = token.fornecedoraId as string | undefined
+
+    if (!fornecedoraId) {
+      // Not a fornecedora - redirect to loja
+      return NextResponse.redirect(new URL('/loja', request.url))
     }
   }
 

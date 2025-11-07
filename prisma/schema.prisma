@@ -54,8 +54,7 @@ enum UserRole {
   ADMIN      // Super usuário
   DONO       // Proprietário do brechó
   VENDEDOR   // Funcionário
-  FORNECEDOR // Acesso ao portal
-  CLIENTE    // Cliente comum
+  CLIENTE    // Cliente comum (pode se tornar fornecedora)
 }
 
 model User {
@@ -87,7 +86,8 @@ model User {
   comissao      Float     @default(0) // %
   metaMensal    Float     @default(0)
 
-  // Para fornecedores
+  // Para clientes que se tornaram fornecedoras
+  // Um CLIENTE com fornecedoraId preenchido tem acesso ao portal de fornecedoras
   fornecedoraId String?   @unique
   fornecedora   Fornecedora? @relation(fields: [fornecedoraId], references: [id])
 
