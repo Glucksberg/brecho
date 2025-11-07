@@ -33,15 +33,16 @@ async function main() {
   })
   console.log(`✅ Brechó criado: ${brecho.nome}`)
 
-  // 2. Criar Usuário Admin
-  console.log('👤 Criando usuário administrador...')
+  // 2. Criar Usuários (todos os 5 níveis do RBAC)
+  console.log('👤 Criando usuários (5 níveis RBAC)...')
   const hashedPassword = await bcrypt.hash('admin123', 10)
 
+  // ADMIN - Super usuário, acesso total
   const admin = await prisma.user.upsert({
     where: { email: 'admin@retrocarolis.com.br' },
     update: {},
     create: {
-      name: 'Administrador',
+      name: 'Administrador Sistema',
       email: 'admin@retrocarolis.com.br',
       password: hashedPassword,
       role: UserRole.ADMIN,
@@ -54,8 +55,25 @@ async function main() {
   })
   console.log(`✅ Admin criado: ${admin.email}`)
 
-  // 3. Criar Usuário Vendedor
-  console.log('👤 Criando usuário vendedor...')
+  // DONO - Proprietário do brechó
+  const dono = await prisma.user.upsert({
+    where: { email: 'dono@retrocarolis.com.br' },
+    update: {},
+    create: {
+      name: 'Carolina Oliveira',
+      email: 'dono@retrocarolis.com.br',
+      password: hashedPassword,
+      role: UserRole.DONO,
+      brechoId: brecho.id,
+      ativo: true,
+      comissao: 0,
+      metaMensal: 0,
+      permissoes: []
+    }
+  })
+  console.log(`✅ Dono criado: ${dono.email}`)
+
+  // VENDEDOR - Funcionário
   const vendedor = await prisma.user.upsert({
     where: { email: 'vendedor@retrocarolis.com.br' },
     update: {},
@@ -73,30 +91,7 @@ async function main() {
   })
   console.log(`✅ Vendedor criado: ${vendedor.email}`)
 
-  // 4. Criar Cliente de Teste
-  console.log('👤 Criando cliente de teste...')
-  const cliente = await prisma.cliente.upsert({
-    where: {
-      email_brechoId: {
-        email: 'cliente@teste.com',
-        brechoId: brecho.id
-      }
-    },
-    update: {},
-    create: {
-      nome: 'João Cliente',
-      email: 'cliente@teste.com',
-      telefone: '(11) 98888-8888',
-      cpf: '123.456.789-00',
-      brechoId: brecho.id,
-      ativo: true,
-      totalCompras: 0,
-      numeroCompras: 0
-    }
-  })
-  console.log(`✅ Cliente criado: ${cliente.nome}`)
-
-  // 5. Criar algumas Fornecedoras
+  // 3. Criar Fornecedoras
   console.log('👗 Criando fornecedoras...')
   const fornecedora1 = await prisma.fornecedora.create({
     data: {
@@ -130,6 +125,67 @@ async function main() {
     }
   })
   console.log(`✅ Fornecedoras criadas: ${fornecedora1.nome}, ${fornecedora2.nome}`)
+
+  // FORNECEDOR - Usuário vinculado à fornecedora (acesso ao portal)
+  const fornecedor = await prisma.user.upsert({
+    where: { email: 'fornecedor@email.com' },
+    update: {},
+    create: {
+      name: 'Ana Paula Santos',
+      email: 'fornecedor@email.com',
+      password: hashedPassword,
+      role: UserRole.FORNECEDOR,
+      brechoId: brecho.id,
+      fornecedoraId: fornecedora1.id,
+      ativo: true,
+      comissao: 0,
+      metaMensal: 0,
+      permissoes: []
+    }
+  })
+  console.log(`✅ Fornecedor criado: ${fornecedor.email} (vinculado à ${fornecedora1.nome})`)
+
+  // 4. Criar Cliente
+  console.log('👤 Criando cliente...')
+  const clienteRecord = await prisma.cliente.upsert({
+    where: {
+      email_brechoId: {
+        email: 'cliente@email.com',
+        brechoId: brecho.id
+      }
+    },
+    update: {},
+    create: {
+      nome: 'João Cliente',
+      email: 'cliente@email.com',
+      telefone: '(11) 98888-8888',
+      cpf: '123.456.789-00',
+      brechoId: brecho.id,
+      ativo: true,
+      totalCompras: 0,
+      numeroCompras: 0
+    }
+  })
+  console.log(`✅ Cliente criado: ${clienteRecord.nome}`)
+
+  // CLIENTE - Usuário cliente (acesso à loja online)
+  const clienteUser = await prisma.user.upsert({
+    where: { email: 'cliente@email.com' },
+    update: {},
+    create: {
+      name: 'João Cliente',
+      email: 'cliente@email.com',
+      password: hashedPassword,
+      role: UserRole.CLIENTE,
+      telefone: '(11) 98888-8888',
+      cpf: '123.456.789-00',
+      ativo: true,
+      comissao: 0,
+      metaMensal: 0,
+      permissoes: []
+    }
+  })
+  console.log(`✅ Usuário Cliente criado: ${clienteUser.email}`)
 
   // 6. Criar alguns Produtos
   console.log('👕 Criando produtos...')
@@ -228,16 +284,35 @@ async function main() {
   console.log('')
   console.log('✅ Seed concluído com sucesso!')
   console.log('')
-  console.log('📝 Credenciais de acesso:')
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-  console.log('🔐 ADMIN:')
+  console.log('📝 Credenciais de acesso (todos os 5 níveis RBAC):')
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+  console.log('')
+  console.log('🔐 ADMIN (Super usuário, acesso total):')
   console.log('   Email: admin@retrocarolis.com.br')
   console.log('   Senha: admin123')
+  console.log('   → Redireciona para: /dashboard')
   console.log('')
-  console.log('🔐 VENDEDOR:')
+  console.log('🔐 DONO (Proprietário do brechó):')
+  console.log('   Email: dono@retrocarolis.com.br')
+  console.log('   Senha: admin123')
+  console.log('   → Redireciona para: /dashboard')
+  console.log('')
+  console.log('🔐 VENDEDOR (Funcionário com comissão):')
   console.log('   Email: vendedor@retrocarolis.com.br')
   console.log('   Senha: admin123')
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+  console.log('   → Redireciona para: /dashboard')
+  console.log('')
+  console.log('🔐 FORNECEDOR (Acesso ao portal de fornecedoras):')
+  console.log('   Email: fornecedor@email.com')
+  console.log('   Senha: admin123')
+  console.log('   → Redireciona para: /portal-fornecedora')
+  console.log('')
+  console.log('🔐 CLIENTE (Cliente da loja online):')
+  console.log('   Email: cliente@email.com')
+  console.log('   Senha: admin123')
+  console.log('   → Redireciona para: /loja')
+  console.log('')
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
   console.log('')
 }
 
