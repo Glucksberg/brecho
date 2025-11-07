@@ -1,17 +1,36 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useSession } from 'next-auth/react'
 import { LojaLayout } from '@/components/layout'
 import { Card, CardHeader, CardTitle, CardContent, Button, Input, Badge } from '@/components/ui'
-import { User, Mail, Phone, MapPin, Lock, Package, Heart, CreditCard, LogOut } from 'lucide-react'
+import { User, Mail, Phone, MapPin, Lock, Package, Heart, CreditCard, LogOut, Store, ArrowRight, Sparkles } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 
 type Tab = 'perfil' | 'pedidos' | 'favoritos' | 'endereco' | 'senha'
 
 export default function MinhaContaPage() {
+  const router = useRouter()
+  const { data: session } = useSession()
   const [activeTab, setActiveTab] = useState<Tab>('perfil')
   const [loading, setLoading] = useState(false)
+  const [canBecomeFornecedora, setCanBecomeFornecedora] = useState(false)
+
+  useEffect(() => {
+    checkFornecedoraStatus()
+  }, [session])
+
+  const checkFornecedoraStatus = async () => {
+    try {
+      const response = await fetch('/api/tornar-se-fornecedora')
+      const data = await response.json()
+      setCanBecomeFornecedora(data.canBecomeFornecedora)
+    } catch (error) {
+      // Silently fail
+    }
+  }
 
   // Mock user data
   const usuario = {
@@ -96,6 +115,43 @@ export default function MinhaContaPage() {
         <h1 className="text-3xl font-bold text-gray-900 mb-8">
           Minha Conta
         </h1>
+
+        {/* Banner Tornar-se Fornecedora */}
+        {canBecomeFornecedora && (
+          <Card variant="bordered" className="mb-8 bg-gradient-to-r from-purple-50 to-pink-50 border-purple-200">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0">
+                    <Store className="w-8 h-8 text-purple-600" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="text-xl font-bold text-purple-900">
+                        Torne-se uma Fornecedora
+                      </h3>
+                      <Sparkles className="w-5 h-5 text-purple-600" />
+                    </div>
+                    <p className="text-purple-700">
+                      Venda suas peças em consignação e ganhe <strong>60% do valor</strong> de cada venda!
+                    </p>
+                    <p className="text-sm text-purple-600 mt-1">
+                      ✨ Sem taxas de cadastro • Portal exclusivo • Pagamentos garantidos
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  variant="primary"
+                  className="bg-purple-600 hover:bg-purple-700"
+                  rightIcon={<ArrowRight className="w-5 h-5" />}
+                  onClick={() => router.push('/loja/tornar-se-fornecedora')}
+                >
+                  Quero ser Fornecedora
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           {/* Sidebar */}
