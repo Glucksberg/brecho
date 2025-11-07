@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { successResponse, handleApiError } from '@/lib/api-helpers'
-import { startOfDay, endOfDay, startOfMonth, endOfMonth, subMonths } from 'date-fns'
+import { startOfDay, endOfDay, startOfMonth, endOfMonth, subMonths, subDays } from 'date-fns'
 
 /**
  * GET /api/dashboard/stats
@@ -24,6 +24,11 @@ export async function GET(request: NextRequest) {
     const inicioMesAnterior = startOfMonth(subMonths(hoje, 1))
     const fimMesAnterior = endOfMonth(subMonths(hoje, 1))
 
+    // Dia anterior para calcular crescimento diário
+    const diaAnterior = subDays(hoje, 1)
+    const inicioDiaAnterior = startOfDay(diaAnterior)
+    const fimDiaAnterior = endOfDay(diaAnterior)
+
     // Vendas de hoje
     const vendasHoje = await prisma.venda.aggregate({
       where: {
@@ -36,6 +41,19 @@ export async function GET(request: NextRequest) {
       },
       _sum: { valorTotal: true },
       _count: true
+    })
+
+    // Vendas do dia anterior
+    const vendasDiaAnterior = await prisma.venda.aggregate({
+      where: {
+        brechoId,
+        status: 'FINALIZADA',
+        dataCriacao: {
+          gte: inicioDiaAnterior,
+          lte: fimDiaAnterior
+        }
+      },
+      _sum: { valorTotal: true }
     })
 
     // Vendas do mês
@@ -102,9 +120,13 @@ export async function GET(request: NextRequest) {
       return ((atual - anterior) / anterior) * 100
     }
 
+    const totalVendasHoje = vendasHoje._sum.valorTotal || 0
+    const totalVendasDiaAnterior = vendasDiaAnterior._sum.valorTotal || 0
+    const crescimentoDiario = calcularCrescimento(totalVendasHoje, totalVendasDiaAnterior)
+
     const totalVendasMes = vendasMes._sum.valorTotal || 0
     const totalVendasMesAnterior = vendasMesAnterior._sum.valorTotal || 0
-    const crescimento = calcularCrescimento(totalVendasMes, totalVendasMesAnterior)
+    const crescimentoMensal = calcularCrescimento(totalVendasMes, totalVendasMesAnterior)
 
     // Ticket médio
     const ticketMedio = vendasMes._count > 0
@@ -113,14 +135,14 @@ export async function GET(request: NextRequest) {
 
     const stats = {
       vendasHoje: {
-        total: vendasHoje._sum.valorTotal || 0,
+        total: totalVendasHoje,
         quantidade: vendasHoje._count,
-        crescimento: 0 // TODO: Calcular crescimento vs dia anterior
+        crescimento: Math.round(crescimentoDiario * 100) / 100
       },
       vendasMes: {
         total: totalVendasMes,
         quantidade: vendasMes._count,
-        crescimento: Math.round(crescimento * 100) / 100
+        crescimento: Math.round(crescimentoMensal * 100) / 100
       },
       produtosAtivos,
       produtosVendidosMes: produtosVendidosMes._sum.quantidade || 0,

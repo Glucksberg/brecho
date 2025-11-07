@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import { AdminLayout } from '@/components/layout'
 import { StatCard } from '@/components/dashboard/StatCard'
 import { Card, CardHeader, CardTitle, CardContent, Badge } from '@/components/ui'
@@ -13,39 +14,101 @@ import {
   AlertCircle
 } from 'lucide-react'
 
+interface Stats {
+  vendasHoje: {
+    total: number
+    quantidade: number
+    crescimento: number
+  }
+  vendasMes: {
+    total: number
+    quantidade: number
+    crescimento: number
+  }
+  produtosAtivos: number
+  produtosVendidosMes: number
+  ticketMedio: number
+  caixaAberto: boolean
+  saldoCaixa: number
+}
+
+interface RecentSale {
+  id: string
+  cliente: string
+  valor: number
+  produtos: number
+  tempo: string
+}
+
+interface LowStockProduct {
+  id: string
+  nome: string
+  estoque: number
+  categoria: string
+}
+
 export default function DashboardPage() {
-  // TODO: Fetch real data from API
-  const stats = {
-    vendasHoje: {
-      total: 2450.00,
-      quantidade: 12,
-      crescimento: 0
-    },
-    vendasMes: {
-      total: 45800.00,
-      quantidade: 234,
-      crescimento: 15.3
-    },
-    produtosAtivos: 1247,
-    produtosVendidosMes: 187,
-    ticketMedio: 195.73,
-    caixaAberto: true,
-    saldoCaixa: 3250.00
+  const [stats, setStats] = useState<Stats | null>(null)
+  const [recentSales, setRecentSales] = useState<RecentSale[]>([])
+  const [lowStockProducts, setLowStockProducts] = useState<LowStockProduct[]>([])
+  const [loading, setLoading] = useState(true)
+
+  // TODO: Get brechoId from session/context
+  const brechoId = 'default-brecho-id'
+
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        setLoading(true)
+
+        // Fetch all dashboard data in parallel
+        const [statsRes, salesRes, stockRes] = await Promise.all([
+          fetch(`/api/dashboard/stats?brechoId=${brechoId}`),
+          fetch(`/api/dashboard/vendas-recentes?brechoId=${brechoId}&limit=4`),
+          fetch(`/api/dashboard/estoque-baixo?brechoId=${brechoId}&limit=5`)
+        ])
+
+        const [statsData, salesData, stockData] = await Promise.all([
+          statsRes.json(),
+          salesRes.json(),
+          stockRes.json()
+        ])
+
+        if (statsData) setStats(statsData)
+        if (salesData?.vendas) setRecentSales(salesData.vendas)
+        if (stockData?.produtos) setLowStockProducts(stockData.produtos)
+      } catch (error) {
+        console.error('Error fetching dashboard data:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchDashboardData()
+  }, [brechoId])
+
+  if (loading) {
+    return (
+      <AdminLayout title="Dashboard">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+            <p className="mt-4 text-gray-600">Carregando dashboard...</p>
+          </div>
+        </div>
+      </AdminLayout>
+    )
   }
 
-  // Mock data for recent activities
-  const recentSales = [
-    { id: 1, cliente: 'Maria Silva', valor: 185.00, produtos: 3, tempo: '5 min atrás' },
-    { id: 2, cliente: 'João Santos', valor: 320.00, produtos: 2, tempo: '12 min atrás' },
-    { id: 3, cliente: 'Ana Costa', valor: 95.50, produtos: 1, tempo: '28 min atrás' },
-    { id: 4, cliente: 'Pedro Lima', valor: 450.00, produtos: 4, tempo: '1 hora atrás' },
-  ]
-
-  const lowStockProducts = [
-    { id: 1, nome: 'Vestido Floral Vintage', estoque: 1, categoria: 'Feminino' },
-    { id: 2, nome: 'Jaqueta Jeans Anos 90', estoque: 2, categoria: 'Masculino' },
-    { id: 3, nome: 'Bolsa de Couro Marrom', estoque: 1, categoria: 'Acessórios' },
-  ]
+  if (!stats) {
+    return (
+      <AdminLayout title="Dashboard">
+        <div className="flex items-center justify-center h-64">
+          <p className="text-gray-600">Erro ao carregar dados do dashboard</p>
+        </div>
+      </AdminLayout>
+    )
+  }
 
   return (
     <AdminLayout title="Dashboard">

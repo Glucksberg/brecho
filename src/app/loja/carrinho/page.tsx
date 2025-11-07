@@ -3,22 +3,73 @@
 import { useState } from 'react'
 import { LojaLayout } from '@/components/layout'
 import { Card, CardHeader, CardTitle, CardContent, Button, Input } from '@/components/ui'
-import { Trash2, Plus, Minus, Tag, ShoppingBag } from 'lucide-react'
+import { Trash2, Plus, Minus, Tag, ShoppingBag, Check, X } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import { useCart } from '@/contexts/CartContext'
 import Link from 'next/link'
 
+interface CupomAplicado {
+  codigo: string
+  descricao: string
+  tipo: 'PERCENTUAL' | 'FIXO'
+  valor: number
+  desconto: number
+}
+
 export default function CarrinhoPage() {
-  const [cupom, setCupom] = useState('')
+  const [cupomCodigo, setCupomCodigo] = useState('')
+  const [cupomAplicado, setCupomAplicado] = useState<CupomAplicado | null>(null)
+  const [cupomErro, setCupomErro] = useState('')
+  const [loadingCupom, setLoadingCupom] = useState(false)
   const { items, cartTotal, updateQuantity, removeFromCart } = useCart()
 
-  const aplicarCupom = () => {
-    // TODO: Implement coupon validation
-    console.log('Aplicar cupom:', cupom)
+  const aplicarCupom = async () => {
+    if (!cupomCodigo.trim()) return
+
+    setCupomErro('')
+    setLoadingCupom(true)
+
+    try {
+      const response = await fetch('/api/cupons/validar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          codigo: cupomCodigo,
+          subtotal: cartTotal
+        })
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        setCupomErro(data.error || 'Cupom inválido')
+        setCupomAplicado(null)
+        return
+      }
+
+      setCupomAplicado({
+        codigo: data.cupom.codigo,
+        descricao: data.cupom.descricao,
+        tipo: data.cupom.tipo,
+        valor: data.cupom.valor,
+        desconto: data.desconto
+      })
+      setCupomCodigo('')
+    } catch (error) {
+      setCupomErro('Erro ao validar cupom')
+      setCupomAplicado(null)
+    } finally {
+      setLoadingCupom(false)
+    }
+  }
+
+  const removerCupom = () => {
+    setCupomAplicado(null)
+    setCupomErro('')
   }
 
   const subtotal = cartTotal
-  const desconto = 0 // TODO: Calculate discount from coupon
+  const desconto = cupomAplicado?.desconto || 0
   const frete = subtotal >= 200 ? 0 : 15.00
   const total = subtotal - desconto + frete
 
@@ -133,18 +184,57 @@ export default function CarrinhoPage() {
             {/* Coupon */}
             <Card variant="bordered" className="mt-4">
               <CardContent className="p-4">
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="Código do cupom"
-                    value={cupom}
-                    onChange={(e) => setCupom(e.target.value)}
-                    leftIcon={<Tag className="w-5 h-5" />}
-                    className="flex-1"
-                  />
-                  <Button variant="outline" onClick={aplicarCupom}>
-                    Aplicar
-                  </Button>
-                </div>
+                {cupomAplicado ? (
+                  <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <Check className="w-5 h-5 text-green-600" />
+                      <div>
+                        <p className="font-medium text-green-900">{cupomAplicado.codigo}</p>
+                        <p className="text-sm text-green-700">{cupomAplicado.descricao}</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={removerCupom}
+                      className="text-green-600 hover:text-green-700"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+                ) : (
+                  <div>
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="Código do cupom"
+                        value={cupomCodigo}
+                        onChange={(e) => {
+                          setCupomCodigo(e.target.value)
+                          setCupomErro('')
+                        }}
+                        leftIcon={<Tag className="w-5 h-5" />}
+                        className="flex-1"
+                        onKeyPress={(e) => {
+                          if (e.key === 'Enter') {
+                            aplicarCupom()
+                          }
+                        }}
+                      />
+                      <Button
+                        variant="outline"
+                        onClick={aplicarCupom}
+                        loading={loadingCupom}
+                        disabled={!cupomCodigo.trim()}
+                      >
+                        Aplicar
+                      </Button>
+                    </div>
+                    {cupomErro && (
+                      <p className="text-sm text-red-600 mt-2 flex items-center gap-1">
+                        <X className="w-4 h-4" />
+                        {cupomErro}
+                      </p>
+                    )}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>

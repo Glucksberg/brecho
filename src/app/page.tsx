@@ -1,15 +1,29 @@
 import { redirect } from 'next/navigation'
+import { getServerSession } from '@/lib/auth'
 
 /**
  * Home Page - Redirects to appropriate page based on user type
- * For now, redirects to login
  */
-export default function HomePage() {
-  // TODO: Check if user is authenticated and redirect accordingly
-  // - Admin/Dono/Vendedor -> /dashboard
-  // - Fornecedor -> /portal-fornecedora
-  // - Cliente -> /loja
-  // - Not authenticated -> /login
+export default async function HomePage() {
+  const session = await getServerSession()
 
-  redirect('/login')
+  // Not authenticated - redirect to login
+  if (!session || !session.user) {
+    redirect('/login')
+  }
+
+  // Redirect based on user role
+  switch (session.user.role) {
+    case 'ADMIN':
+    case 'DONO':
+    case 'VENDEDOR':
+      redirect('/dashboard')
+
+    case 'FORNECEDOR':
+      redirect('/portal-fornecedora')
+
+    case 'CLIENTE':
+    default:
+      redirect('/loja')
+  }
 }

@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
       },
       include: {
         vendedor: {
-          select: { id: true, nome: true }
+          select: { id: true, name: true, comissao: true }
         },
         itens: {
           include: {
@@ -116,7 +116,7 @@ export async function GET(request: NextRequest) {
       if (!acc[vendedorId]) {
         acc[vendedorId] = {
           vendedorId,
-          vendedorNome: venda.vendedor.nome,
+          vendedorNome: venda.vendedor.name || 'Sem nome',
           total: 0,
           quantidade: 0,
           comissao: 0
@@ -124,7 +124,9 @@ export async function GET(request: NextRequest) {
       }
       acc[vendedorId].total += venda.valorTotal
       acc[vendedorId].quantidade += 1
-      // TODO: Calculate commission based on vendedor.comissao
+      // Calculate commission based on vendedor.comissao percentage
+      const comissaoVenda = venda.valorTotal * (venda.vendedor.comissao / 100)
+      acc[vendedorId].comissao += comissaoVenda
       return acc
     }, {} as Record<string, VendaVendedor>)
 
