@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useSession } from 'next-auth/react'
 import { AdminLayout } from '@/components/layout'
 import { StatCard } from '@/components/dashboard/StatCard'
 import { Card, CardHeader, CardTitle, CardContent, Badge } from '@/components/ui'
@@ -47,36 +48,72 @@ interface LowStockProduct {
   categoria: string
 }
 
+function getDefaultStats(): Stats {
+  return {
+    vendasHoje: { total: 0, quantidade: 0, crescimento: 0 },
+    vendasMes: { total: 0, quantidade: 0, crescimento: 0 },
+    produtosAtivos: 0,
+    produtosVendidosMes: 0,
+    ticketMedio: 0,
+    caixaAberto: false,
+    saldoCaixa: 0
+  }
+}
+
 export default function DashboardPage() {
   const [stats, setStats] = useState<Stats | null>(null)
   const [recentSales, setRecentSales] = useState<RecentSale[]>([])
   const [lowStockProducts, setLowStockProducts] = useState<LowStockProduct[]>([])
   const [loading, setLoading] = useState(true)
 
-  // TODO: Get brechoId from session/context
-  const brechoId = 'default-brecho-id'
+  // Obter brechoId da sessão (quando disponível)
+  const { data: session } = useSession()
+  const brechoId = (session as any)?.user?.brechoId ?? null
 
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
         setLoading(true)
 
-        // Fetch all dashboard data in parallel
+        // Se não houver brechoId, mostrar dashboard vazio (evitar erro)
+        if (!brechoId) {
+          setStats(getDefaultStats())
+          setRecentSales([])
+          setLowStockProducts([])
+          return
+        }
+
+        // Buscar todos os dados do dashboard em paralelo
         const [statsRes, salesRes, stockRes] = await Promise.all([
-          fetch(`/api/dashboard/stats?brechoId=${brechoId}`),
-          fetch(`/api/dashboard/vendas-recentes?brechoId=${brechoId}&limit=4`),
-          fetch(`/api/dashboard/estoque-baixo?brechoId=${brechoId}&limit=5`)
+          fetch(`/api/dashboard/stats?brechoId=${brechoId}`, { cache: 'no-store' }),
+          fetch(`/api/dashboard/vendas-recentes?brechoId=${brechoId}&limit=4`, { cache: 'no-store' }),
+          fetch(`/api/dashboard/estoque-baixo?brechoId=${brechoId}&limit=5`, { cache: 'no-store' })
         ])
 
-        const [statsData, salesData, stockData] = await Promise.all([
-          statsRes.json(),
-          salesRes.json(),
-          stockRes.json()
+        const [statsJson, salesJson, stockJson] = await Promise.all([
+          statsRes.ok ? statsRes.json() : null,
+          salesRes.ok ? salesRes.json() : null,
+          stockRes.ok ? stockRes.json() : null
         ])
 
-        if (statsData) setStats(statsData)
-        if (salesData?.vendas) setRecentSales(salesData.vendas)
-        if (stockData?.produtos) setLowStockProducts(stockData.produtos)
+        // As APIs retornam { success, data }
+        if (statsJson?.success && statsJson.data) {
+          setStats(statsJson.data as Stats)
+        } else {
+          setStats(getDefaultStats())
+        }
+
+        if (salesJson?.success && salesJson.data?.vendas) {
+          setRecentSales(salesJson.data.vendas as RecentSale[])
+        } else {
+          setRecentSales([])
+        }
+
+        if (stockJson?.success && stockJson.data?.produtos) {
+          setLowStockProducts(stockJson.data.produtos as LowStockProduct[])
+        } else {
+          setLowStockProducts([])
+        }
       } catch (error) {
         console.error('Error fetching dashboard data:', error)
       } finally {

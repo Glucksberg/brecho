@@ -71,6 +71,17 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl)
   }
 
+  // If authenticated but without brechoId, force onboarding except for allowed paths
+  const onboardingAllowed = [
+    '/onboarding',
+    '/api/onboarding',
+  ]
+  const hasBrecho = !!(token as any).brechoId
+  const isOnboardingPath = onboardingAllowed.some(path => pathname.startsWith(path))
+  if (!hasBrecho && !isOnboardingPath) {
+    return NextResponse.redirect(new URL('/onboarding', request.url))
+  }
+
   // Check admin access
   if (adminPaths.some(path => pathname.startsWith(path))) {
     const userRole = token.role as string

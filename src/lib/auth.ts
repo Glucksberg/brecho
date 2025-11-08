@@ -98,6 +98,7 @@ export const authOptions: NextAuthOptions = {
               return {
                 id: `portal:${credentials.username}`,
                 name: displayName,
+                username: credentials.username,
                 email,
                 role: UserRole.DONO, // Mapeando MASTER -> DONO local
                 brechoId: undefined,
@@ -164,6 +165,11 @@ export const authOptions: NextAuthOptions = {
         token.fornecedoraId = user.fornecedoraId
         token.avatar = user.avatar
         token.permissoes = user.permissoes || []
+        // @ts-ignore
+        if ((user as any).username) {
+          // @ts-ignore
+          token.username = (user as any).username
+        }
         // Transportar dados do portal de licenças quando presentes
         // @ts-ignore
         if ((user as any).portalToken) {
