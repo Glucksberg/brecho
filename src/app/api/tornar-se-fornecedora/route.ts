@@ -34,7 +34,7 @@ const fornecedoraSchema = z.object({
 export async function POST(request: NextRequest) {
   try {
     // Verificar autenticação
-    const session = await getServerSession()
+    const session = (await getServerSession()) as any
 
     if (!session || !session.user) {
       return NextResponse.json(
@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
         nome: user.name || 'Sem nome',
         cpf: data.cpf || user.cpf,
         email: user.email,
-        telefone: data.telefone || user.telefone,
+        telefone: (data.telefone || user.telefone || '') as string,
         percentualRepasse: data.percentualRepasse,
         endereco: data.endereco || undefined,
         dadosBancarios: data.dadosBancarios || undefined,
@@ -167,7 +167,7 @@ export async function POST(request: NextRequest) {
  */
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession()
+    const session = (await getServerSession()) as any
 
     if (!session || !session.user) {
       return NextResponse.json(

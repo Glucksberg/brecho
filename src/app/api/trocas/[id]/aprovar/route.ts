@@ -39,7 +39,7 @@ export async function POST(
         throw new Error('Troca não encontrada')
       }
 
-      if (trocaAtual.status !== 'PENDENTE') {
+      if (trocaAtual.status !== 'SOLICITADO') {
         throw new Error('Troca já foi processada')
       }
 
@@ -47,10 +47,9 @@ export async function POST(
       const trocaAtualizada = await tx.troca.update({
         where: { id: params.id },
         data: {
-          status: 'APROVADA',
+          status: 'APROVADO',
           dataAprovacao: new Date(),
-          observacoesAprovacao: body.observacoesAprovacao,
-          novaVendaId: body.novaVendaId
+          observacoes: body.observacoesAprovacao
         }
       })
 
@@ -60,7 +59,8 @@ export async function POST(
           await tx.produto.update({
             where: { id: item.produtoId },
             data: {
-              status: 'ATIVO',
+              ativo: true,
+              vendido: false,
               dataVenda: null
             }
           })
@@ -70,18 +70,12 @@ export async function POST(
         await tx.venda.update({
           where: { id: trocaAtual.vendaId },
           data: {
-            status: 'DEVOLVIDA'
+            status: 'ESTORNADO'
           }
         })
       }
 
-      // If TROCA with novaVendaId, link it
-      if (trocaAtual.tipo === 'TROCA' && body.novaVendaId) {
-        await tx.troca.update({
-          where: { id: params.id },
-          data: { novaVendaId: body.novaVendaId }
-        })
-      }
+      // Para TROCA com nova venda, o vínculo pode ser tratado em outra operação
 
       return trocaAtualizada
     })

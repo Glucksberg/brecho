@@ -17,19 +17,14 @@ import {
   Despesa as PrismaDespesa,
   UserRole,
   TipoProduto,
-  StatusProduto,
-  CategoriaProduto,
   CondicaoProduto,
   StatusVenda,
-  TipoPagamento,
   StatusCaixa,
-  TipoMovimentoCaixa,
   StatusTroca,
   TipoTroca,
   MotivoTroca,
   OrigemVenda,
   CreditoStatus,
-  TipoCredito,
   CategoriaDespesa
 } from '@prisma/client'
 
@@ -125,19 +120,14 @@ export type Despesa = PrismaDespesa & {
 export {
   UserRole,
   TipoProduto,
-  StatusProduto,
-  CategoriaProduto,
   CondicaoProduto,
   StatusVenda,
-  TipoPagamento,
   StatusCaixa,
-  TipoMovimentoCaixa,
   StatusTroca,
   TipoTroca,
   MotivoTroca,
   OrigemVenda,
   CreditoStatus,
-  TipoCredito,
   CategoriaDespesa
 }
 
@@ -206,7 +196,7 @@ export interface CreateProdutoDTO {
   nome: string
   descricao?: string
   preco: number
-  categoria: CategoriaProduto
+  categoria: string
   subcategoria?: string
   marca?: string
   tamanho?: string
@@ -225,7 +215,7 @@ export interface CreateProdutoDTO {
 export interface CreateVendaDTO {
   clienteId?: string
   origem: OrigemVenda
-  tipoPagamento: TipoPagamento
+  tipoPagamento: string
   itens: {
     produtoId: string
     quantidade: number
@@ -330,7 +320,7 @@ export interface RelatorioVendas {
     quantidade: number
   }[]
   vendasPorFormaPagamento: {
-    tipo: TipoPagamento
+    tipo: string
     total: number
     quantidade: number
     percentual: number
@@ -383,9 +373,8 @@ export interface CaixaMovimento {
 
 export interface ProdutoFilters {
   search?: string
-  categoria?: CategoriaProduto
+  categoria?: string
   tipo?: TipoProduto
-  status?: StatusProduto
   condicao?: CondicaoProduto
   fornecedoraId?: string
   precoMin?: number
@@ -399,7 +388,7 @@ export interface VendaFilters {
   clienteId?: string
   vendedorId?: string
   origem?: OrigemVenda
-  tipoPagamento?: TipoPagamento
+  tipoPagamento?: string
   status?: StatusVenda
   valorMin?: number
   valorMax?: number

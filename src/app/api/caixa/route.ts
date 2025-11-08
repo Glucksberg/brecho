@@ -31,24 +31,7 @@ export async function GET(request: NextRequest) {
           status: 'ABERTO'
         },
         include: {
-          usuarioAbertura: {
-            select: { id: true, nome: true }
-          },
-          vendas: {
-            where: { status: 'FINALIZADA' },
-            select: {
-              id: true,
-              valorTotal: true,
-              tipoPagamento: true
-            }
-          },
-          despesas: {
-            select: {
-              id: true,
-              descricao: true,
-              valor: true
-            }
-          }
+          operador: { select: { id: true, name: true, email: true } }
         }
       })
 
@@ -65,18 +48,7 @@ export async function GET(request: NextRequest) {
       orderBy: { dataAbertura: 'desc' },
       take: 50,
       include: {
-        usuarioAbertura: {
-          select: { id: true, nome: true }
-        },
-        usuarioFechamento: {
-          select: { id: true, nome: true }
-        },
-        _count: {
-          select: {
-            vendas: true,
-            despesas: true
-          }
-        }
+        operador: { select: { id: true, name: true, email: true } }
       }
     })
 
@@ -119,16 +91,13 @@ export async function POST(request: NextRequest) {
     const caixa = await prisma.caixa.create({
       data: {
         brechoId: body.brechoId,
-        usuarioAberturaId: body.usuarioAberturaId,
+        operadorId: body.usuarioAberturaId,
         saldoInicial: body.saldoInicial,
-        saldoAtual: body.saldoInicial,
         status: 'ABERTO',
         observacoes: body.observacoes
       },
       include: {
-        usuarioAbertura: {
-          select: { id: true, nome: true }
-        }
+        operador: { select: { id: true, name: true, email: true } }
       }
     })
 

@@ -43,11 +43,11 @@ export async function GET(request: NextRequest) {
         where,
         skip,
         take,
-        orderBy: { dataCriacao: 'desc' },
+        orderBy: { createdAt: 'desc' },
         include: {
           _count: {
             select: {
-              produtos: { where: { status: 'ATIVO' } },
+              produtos: { where: { ativo: true } },
               creditos: true
             }
           }

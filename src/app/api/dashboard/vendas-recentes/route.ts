@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic'
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { successResponse, handleApiError } from '@/lib/api-helpers'
@@ -22,7 +23,7 @@ export async function GET(request: NextRequest) {
     const vendas = await prisma.venda.findMany({
       where: {
         brechoId,
-        status: 'FINALIZADA'
+        status: 'PAGO'
       },
       orderBy: {
         dataVenda: 'desc'
@@ -46,7 +47,7 @@ export async function GET(request: NextRequest) {
     const vendasFormatadas = vendas.map(venda => ({
       id: venda.id,
       cliente: venda.cliente.nome,
-      valor: venda.valorTotal,
+      valor: venda.total,
       produtos: venda.itens.length,
       tempo: formatDistanceToNow(venda.dataVenda, {
         addSuffix: true,

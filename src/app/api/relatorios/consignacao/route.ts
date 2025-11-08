@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic'
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { successResponse, errorResponse, handleApiError } from '@/lib/api-helpers'
@@ -40,7 +41,7 @@ export async function GET(request: NextRequest) {
       const produtosAtivos = await prisma.produto.count({
         where: {
           fornecedoraId,
-          status: 'ATIVO'
+          ativo: true
         }
       })
 
@@ -48,7 +49,7 @@ export async function GET(request: NextRequest) {
       const produtosVendidos = await prisma.produto.count({
         where: {
           fornecedoraId,
-          status: 'VENDIDO',
+          vendido: true,
           dataVenda: {
             gte: inicio,
             lte: fim
@@ -60,7 +61,7 @@ export async function GET(request: NextRequest) {
       const creditos = await prisma.credito.findMany({
         where: {
           fornecedoraId,
-          dataCriacao: {
+          createdAt: {
             gte: inicio,
             lte: fim
           }
@@ -97,7 +98,7 @@ export async function GET(request: NextRequest) {
       const totalVendidoQuery = await prisma.credito.aggregate({
         where: {
           fornecedoraId,
-          dataCriacao: {
+          createdAt: {
             gte: inicio,
             lte: fim
           }
@@ -131,13 +132,13 @@ export async function GET(request: NextRequest) {
     const relatorios = await Promise.all(
       fornecedoras.map(async (fornecedora) => {
         const produtosAtivos = await prisma.produto.count({
-          where: { fornecedoraId: fornecedora.id, status: 'ATIVO' }
+          where: { fornecedoraId: fornecedora.id, ativo: true }
         })
 
         const produtosVendidos = await prisma.produto.count({
           where: {
             fornecedoraId: fornecedora.id,
-            status: 'VENDIDO',
+            vendido: true,
             dataVenda: { gte: inicio, lte: fim }
           }
         })
@@ -145,7 +146,7 @@ export async function GET(request: NextRequest) {
         const totalVendido = await prisma.credito.aggregate({
           where: {
             fornecedoraId: fornecedora.id,
-            dataCriacao: { gte: inicio, lte: fim }
+            createdAt: { gte: inicio, lte: fim }
           },
           _sum: { valorVenda: true }
         })

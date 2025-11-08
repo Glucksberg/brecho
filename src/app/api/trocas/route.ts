@@ -54,9 +54,6 @@ export async function GET(request: NextRequest) {
           },
           cliente: {
             select: { id: true, nome: true, email: true }
-          },
-          novaVenda: {
-            select: { id: true, valorTotal: true }
           }
         }
       }),
@@ -106,7 +103,7 @@ export async function POST(request: NextRequest) {
 
     // Validate business rules based on origem
     const diasDesdeVenda = Math.floor(
-      (Date.now() - venda.dataCriacao.getTime()) / (1000 * 60 * 60 * 24)
+      (Date.now() - venda.dataVenda.getTime()) / (1000 * 60 * 60 * 24)
     )
 
     // ONLINE: sempre pode devolver dentro de 7 dias (CDC)
@@ -114,14 +111,10 @@ export async function POST(request: NextRequest) {
       return errorResponse('Prazo de 7 dias para devolução online expirado (CDC)', 400)
     }
 
-    // PRESENCIAL SEM DEFEITO: não permite devolução em dinheiro
-    if (
-      venda.origem === 'PRESENCIAL' &&
-      body.motivo === 'TAMANHO_INADEQUADO' &&
-      body.tipo === 'DEVOLUCAO'
-    ) {
+    // PRESENCIAL: regra de negócio pode restringir devolução
+    if (venda.origem === 'PRESENCIAL' && body.tipo === 'DEVOLUCAO') {
       return errorResponse(
-        'Trocas presenciais sem defeito não permitem devolução em dinheiro',
+        'Devolução para compras presenciais não permitida por política interna',
         400
       )
     }
@@ -131,11 +124,13 @@ export async function POST(request: NextRequest) {
         brechoId: body.brechoId,
         vendaId: body.vendaId,
         clienteId: body.clienteId || venda.clienteId,
+        origem: venda.origem,
+        produtoOriginalId: venda.itens[0]?.produtoId || venda.itens[0]?.produto.id,
+        valorProdutoOriginal: venda.itens[0]?.subtotal || 0,
         tipo: body.tipo,
         motivo: body.motivo,
         observacoes: body.observacoes,
-        status: 'PENDENTE',
-        produtosTroca: body.produtosTroca || []
+        status: 'SOLICITADO'
       },
       include: {
         venda: {

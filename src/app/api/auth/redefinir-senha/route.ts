@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { hash } from 'bcryptjs'
+const bcrypt = require('bcryptjs')
 import { createHash } from 'crypto'
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Hash new password
-    const passwordHash = await hash(senha, 12)
+    const passwordHash = await bcrypt.hash(senha, 12)
 
     // Update password and clear reset token
     await prisma.user.update({

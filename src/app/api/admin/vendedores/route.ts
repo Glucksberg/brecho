@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
 import { getServerSession, requireAdminAuth } from '@/lib/auth'
-import { hash } from 'bcryptjs'
+const bcrypt = require('bcryptjs')
 import { z } from 'zod'
 
 /**
@@ -11,7 +11,7 @@ import { z } from 'zod'
  */
 export async function GET(request: NextRequest) {
   try {
-    const session = await requireAdminAuth()
+    const session = (await requireAdminAuth()) as any
 
     const vendedores = await prisma.user.findMany({
       where: {
@@ -66,7 +66,7 @@ const createVendedorSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await requireAdminAuth()
+    const session = (await requireAdminAuth()) as any
 
     const body = await request.json()
     const data = createVendedorSchema.parse(body)
@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Hash da senha
-    const hashedPassword = await hash(data.password, 12)
+    const hashedPassword = await bcrypt.hash(data.password, 12)
 
     // Criar vendedor
     const vendedor = await prisma.user.create({

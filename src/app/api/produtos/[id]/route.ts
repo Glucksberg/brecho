@@ -53,8 +53,7 @@ export async function PUT(
     const produto = await prisma.produto.update({
       where: { id: params.id },
       data: {
-        ...body,
-        dataAtualizacao: new Date()
+        ...body
       },
       include: {
         fornecedora: {
@@ -85,8 +84,7 @@ export async function DELETE(
     const produto = await prisma.produto.update({
       where: { id: params.id },
       data: {
-        status: 'REMOVIDO',
-        dataAtualizacao: new Date()
+        ativo: false
       }
     })
 

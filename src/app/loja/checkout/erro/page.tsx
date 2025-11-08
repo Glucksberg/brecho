@@ -1,12 +1,14 @@
 'use client'
+export const dynamic = 'force-dynamic'
 
 import { useSearchParams } from 'next/navigation'
+import { Suspense } from 'react'
 import { LojaLayout } from '@/components/layout'
 import { Card, CardContent, Button } from '@/components/ui'
 import { XCircle, RefreshCcw, HelpCircle } from 'lucide-react'
 import Link from 'next/link'
 
-export default function CheckoutErroPage() {
+function CheckoutErroPageInner() {
   const searchParams = useSearchParams()
 
   const paymentId = searchParams.get('payment_id')
@@ -128,5 +130,13 @@ export default function CheckoutErroPage() {
         </div>
       </div>
     </LojaLayout>
+  )
+}
+
+export default function CheckoutErroPage() {
+  return (
+    <Suspense fallback={null}>
+      <CheckoutErroPageInner />
+    </Suspense>
   )
 }

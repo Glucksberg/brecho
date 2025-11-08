@@ -19,7 +19,7 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await requireAdminAuth()
+    const session = (await requireAdminAuth()) as any
     const body = await request.json()
     const data = associarClienteSchema.parse(body)
 
@@ -30,7 +30,7 @@ export async function POST(
       where: {
         id: vendedorId,
         role: 'VENDEDOR',
-        brechoId: session.user.brechoId
+        brechoId: session.user!.brechoId
       }
     })
 
@@ -91,7 +91,7 @@ export async function POST(
     })
 
     logger.info('Cliente associated with vendedor', {
-      donoId: session.user.id,
+      donoId: (session as any).user.id,
       vendedorId,
       clienteId: cliente.id,
       clienteEmail: cliente.email
@@ -164,7 +164,7 @@ export async function DELETE(
     })
 
     logger.info('Cliente dissociated from vendedor', {
-      donoId: session.user.id,
+      donoId: (session as any).user.id,
       vendedorId: params.id,
       clienteId
     })

@@ -10,7 +10,7 @@ import { getServerSession } from '@/lib/auth'
  * - CLIENTE sem fornecedoraId → /loja (cliente comum)
  */
 export default async function HomePage() {
-  const session = await getServerSession()
+  const session = (await getServerSession()) as any
 
   // Not authenticated - redirect to login
   if (!session || !session.user) {
@@ -18,7 +18,7 @@ export default async function HomePage() {
   }
 
   // Redirect based on user role
-  switch (session.user.tipo) {
+  switch ((session.user as any).tipo) {
     case 'ADMIN':
     case 'DONO':
     case 'VENDEDOR':

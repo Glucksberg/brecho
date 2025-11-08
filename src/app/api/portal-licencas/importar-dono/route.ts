@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
-import { hash } from 'bcryptjs'
+const bcrypt = require('bcryptjs')
 import { z } from 'zod'
 
 /**
@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
       }
 
       // 2. Hash da senha
-      const hashedPassword = await hash(data.dono.password, 10)
+      const hashedPassword = await bcrypt.hash(data.dono.password, 10)
 
       // 3. Criar usuário DONO
       // O login do Portal é o username para login administrativo

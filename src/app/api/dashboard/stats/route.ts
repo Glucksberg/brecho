@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic'
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { successResponse, handleApiError } from '@/lib/api-helpers'
@@ -33,13 +34,13 @@ export async function GET(request: NextRequest) {
     const vendasHoje = await prisma.venda.aggregate({
       where: {
         brechoId,
-        status: 'FINALIZADA',
-        dataCriacao: {
+        status: 'PAGO',
+        dataVenda: {
           gte: inicioHoje,
           lte: fimHoje
         }
       },
-      _sum: { valorTotal: true },
+      _sum: { total: true },
       _count: true
     })
 
@@ -47,26 +48,26 @@ export async function GET(request: NextRequest) {
     const vendasDiaAnterior = await prisma.venda.aggregate({
       where: {
         brechoId,
-        status: 'FINALIZADA',
-        dataCriacao: {
+        status: 'PAGO',
+        dataVenda: {
           gte: inicioDiaAnterior,
           lte: fimDiaAnterior
         }
       },
-      _sum: { valorTotal: true }
+      _sum: { total: true }
     })
 
     // Vendas do mês
     const vendasMes = await prisma.venda.aggregate({
       where: {
         brechoId,
-        status: 'FINALIZADA',
-        dataCriacao: {
+        status: 'PAGO',
+        dataVenda: {
           gte: inicioMes,
           lte: fimMes
         }
       },
-      _sum: { valorTotal: true },
+      _sum: { total: true },
       _count: true
     })
 
@@ -74,20 +75,20 @@ export async function GET(request: NextRequest) {
     const vendasMesAnterior = await prisma.venda.aggregate({
       where: {
         brechoId,
-        status: 'FINALIZADA',
-        dataCriacao: {
+        status: 'PAGO',
+        dataVenda: {
           gte: inicioMesAnterior,
           lte: fimMesAnterior
         }
       },
-      _sum: { valorTotal: true }
+      _sum: { total: true }
     })
 
     // Produtos ativos
     const produtosAtivos = await prisma.produto.count({
       where: {
         brechoId,
-        status: 'ATIVO'
+        ativo: true
       }
     })
 
@@ -96,8 +97,8 @@ export async function GET(request: NextRequest) {
       where: {
         venda: {
           brechoId,
-          status: 'FINALIZADA',
-          dataCriacao: {
+          status: 'PAGO',
+          dataVenda: {
             gte: inicioMes,
             lte: fimMes
           }
@@ -120,12 +121,12 @@ export async function GET(request: NextRequest) {
       return ((atual - anterior) / anterior) * 100
     }
 
-    const totalVendasHoje = vendasHoje._sum.valorTotal || 0
-    const totalVendasDiaAnterior = vendasDiaAnterior._sum.valorTotal || 0
+    const totalVendasHoje = (vendasHoje._sum.total as number) || 0
+    const totalVendasDiaAnterior = (vendasDiaAnterior._sum.total as number) || 0
     const crescimentoDiario = calcularCrescimento(totalVendasHoje, totalVendasDiaAnterior)
 
-    const totalVendasMes = vendasMes._sum.valorTotal || 0
-    const totalVendasMesAnterior = vendasMesAnterior._sum.valorTotal || 0
+    const totalVendasMes = (vendasMes._sum.total as number) || 0
+    const totalVendasMesAnterior = (vendasMesAnterior._sum.total as number) || 0
     const crescimentoMensal = calcularCrescimento(totalVendasMes, totalVendasMesAnterior)
 
     // Ticket médio
@@ -148,7 +149,7 @@ export async function GET(request: NextRequest) {
       produtosVendidosMes: produtosVendidosMes._sum.quantidade || 0,
       ticketMedio: Math.round(ticketMedio * 100) / 100,
       caixaAberto: !!caixaAberto,
-      saldoCaixa: caixaAberto?.saldoAtual || 0
+      saldoCaixa: caixaAberto?.saldoInicial || 0
     }
 
     return successResponse(stats)

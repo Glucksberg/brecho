@@ -20,7 +20,7 @@ function slugify(input: string): string {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession()
+    const session = (await getServerSession()) as any
     if (!session || !session.user) {
       return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
     }
@@ -30,8 +30,8 @@ export async function POST(request: NextRequest) {
 
     // Derivar username da sessão (portal:<username>) quando vindo do portal
     let username: string | undefined
-    if (session.user.id?.startsWith('portal:')) {
-      username = session.user.id.split(':', 2)[1]
+    if ((session.user.id as string)?.startsWith('portal:')) {
+      username = (session.user.id as string).split(':', 2)[1]
     }
 
     // Se não conseguir derivar, tentar do token (via middleware) ou retornar erro
@@ -105,14 +105,14 @@ export async function POST(request: NextRequest) {
       const user = await tx.user.upsert({
         where: { username },
         update: {
-          name: session.user.nome || session.user.id || username,
+          name: session.user.name || session.user.id || username,
           email,
           role: 'DONO',
           brechoId: brecho.id,
           ativo: true
         },
         create: {
-          name: session.user.nome || username,
+          name: session.user.name || username,
           username,
           email,
           role: 'DONO',

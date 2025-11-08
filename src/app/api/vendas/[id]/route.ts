@@ -33,8 +33,6 @@ export async function GET(
             }
           }
         },
-        creditoUtilizado: true,
-        caixa: true,
         trocas: true
       }
     })
@@ -74,7 +72,7 @@ export async function PUT(
         throw new Error('Venda não encontrada')
       }
 
-      if (vendaAtual.status === 'CANCELADA') {
+      if (vendaAtual.status === 'CANCELADO') {
         throw new Error('Venda já está cancelada')
       }
 
@@ -82,8 +80,7 @@ export async function PUT(
       const vendaAtualizada = await tx.venda.update({
         where: { id: params.id },
         data: {
-          status: 'CANCELADA',
-          dataAtualizacao: new Date()
+          status: 'CANCELADO'
         }
       })
 
@@ -92,25 +89,9 @@ export async function PUT(
         await tx.produto.update({
           where: { id: item.produtoId },
           data: {
-            status: 'ATIVO',
+            ativo: true,
+            vendido: false,
             dataVenda: null
-          }
-        })
-      }
-
-      // Cancel creditos
-      await tx.credito.updateMany({
-        where: { vendaId: params.id },
-        data: { status: 'CANCELADO' }
-      })
-
-      // Revert caixa if needed
-      if (vendaAtual.caixaId && vendaAtual.tipoPagamento === 'DINHEIRO') {
-        await tx.caixa.update({
-          where: { id: vendaAtual.caixaId },
-          data: {
-            saldoAtual: { decrement: vendaAtual.valorTotal },
-            vendasDinheiro: { decrement: vendaAtual.valorTotal }
           }
         })
       }

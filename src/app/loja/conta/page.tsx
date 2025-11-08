@@ -143,10 +143,12 @@ export default function MinhaContaPage() {
                 <Button
                   variant="primary"
                   className="bg-purple-600 hover:bg-purple-700"
-                  rightIcon={<ArrowRight className="w-5 h-5" />}
                   onClick={() => router.push('/loja/tornar-se-fornecedora')}
                 >
-                  Quero ser Fornecedora
+                  <span className="inline-flex items-center gap-2">
+                    Quero ser Fornecedora
+                    <ArrowRight className="w-5 h-5" />
+                  </span>
                 </Button>
               </div>
             </CardContent>

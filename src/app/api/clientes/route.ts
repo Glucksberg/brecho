@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
         where,
         skip,
         take,
-        orderBy: { dataCriacao: 'desc' },
+        orderBy: { createdAt: 'desc' },
         include: {
           _count: {
             select: {
@@ -78,14 +78,14 @@ export async function GET(request: NextRequest) {
         const totalGasto = await prisma.venda.aggregate({
           where: {
             clienteId: cliente.id,
-            status: 'FINALIZADA'
+            status: 'PAGO'
           },
-          _sum: { valorTotal: true }
+          _sum: { total: true }
         })
 
         return {
           ...cliente,
-          totalGasto: totalGasto._sum.valorTotal || 0,
+          totalGasto: (totalGasto._sum.total as number) || 0,
           totalCompras: cliente._count.vendas
         }
       })

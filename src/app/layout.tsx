@@ -8,6 +8,9 @@ const inter = Inter({ subsets: ['latin'] })
 export const metadata: Metadata = {
   title: 'Retrô Carólis - Sistema de Gestão para Brechós',
   description: 'Sistema completo de gestão para brechós com e-commerce integrado',
+  icons: {
+    icon: '/favicon.ico',
+  },
 }
 
 export default function RootLayout({

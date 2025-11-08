@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
     if (brechoId) where.brechoId = brechoId
     if (status) where.status = status as any // Status comes from URL params
     if (origem) where.origem = origem as any // Origem comes from URL params
-    if (tipoPagamento) where.metodoPagamento = tipoPagamento
+    if (tipoPagamento) where.formaPagamento = tipoPagamento as any
     if (clienteId) where.clienteId = clienteId
     if (vendedorId) where.vendedorId = vendedorId
 
@@ -42,9 +42,9 @@ export async function GET(request: NextRequest) {
     const dataFim = searchParams.get('dataFim')
 
     if (dataInicio || dataFim) {
-      where.dataCriacao = {}
-      if (dataInicio) where.dataCriacao.gte = new Date(dataInicio)
-      if (dataFim) where.dataCriacao.lte = new Date(dataFim)
+      where.dataVenda = {}
+      if (dataInicio) where.dataVenda.gte = new Date(dataInicio)
+      if (dataFim) where.dataVenda.lte = new Date(dataFim)
     }
 
     const [vendas, total] = await Promise.all([
@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
         where,
         skip,
         take,
-        orderBy: { dataCriacao: 'desc' },
+        orderBy: { dataVenda: 'desc' },
         include: {
           cliente: {
             select: {
@@ -64,7 +64,7 @@ export async function GET(request: NextRequest) {
           vendedor: {
             select: {
               id: true,
-              nome: true
+              name: true
             }
           },
           itens: {
@@ -131,18 +131,16 @@ export async function POST(request: NextRequest) {
       // Create venda
       const novaVenda = await tx.venda.create({
         data: {
+          numeroVenda: `VD-${Date.now()}`,
           brechoId: body.brechoId,
-          clienteId: body.clienteId,
-          vendedorId: body.vendedorId,
+          clienteId: body.clienteId as string,
+          vendedorId: (body as any).vendedorId as string,
           origem: body.origem,
-          tipoPagamento: body.tipoPagamento,
-          valorProdutos,
+          formaPagamento: body.tipoPagamento as any,
+          subtotal: valorProdutos,
           desconto,
-          valorTotal,
-          status: 'FINALIZADA',
-          creditoUtilizadoId: body.creditoUtilizadoId,
-          valorCreditoUtilizado,
-          caixaId: body.caixaId
+          total: valorTotal,
+          status: 'PAGO'
         }
       })
 
@@ -154,8 +152,7 @@ export async function POST(request: NextRequest) {
             produtoId: item.produtoId,
             quantidade: item.quantidade,
             precoUnitario: item.precoUnitario,
-            desconto: item.desconto || 0,
-            total: item.precoUnitario * item.quantidade - (item.desconto || 0)
+            subtotal: item.precoUnitario * item.quantidade - (item.desconto || 0)
           }
         })
 
@@ -163,7 +160,8 @@ export async function POST(request: NextRequest) {
         await tx.produto.update({
           where: { id: item.produtoId },
           data: {
-            status: 'VENDIDO',
+            ativo: false,
+            vendido: true,
             dataVenda: new Date()
           }
         })
@@ -187,27 +185,16 @@ export async function POST(request: NextRequest) {
             data: {
               fornecedoraId: produto.fornecedoraId,
               vendaId: novaVenda.id,
-              itemVendaId: item.produtoId,
+              produtoId: item.produtoId,
+              dataVenda: new Date(),
               valorVenda,
               percentualRepasse,
               valorCredito,
               status: 'PENDENTE',
-              dataLiberacao,
-              tipo: 'VENDA'
+              dataLiberacao
             }
           })
         }
-      }
-
-      // Update caixa if exists
-      if (body.caixaId && body.tipoPagamento === 'DINHEIRO') {
-        await tx.caixa.update({
-          where: { id: body.caixaId },
-          data: {
-            saldoAtual: { increment: valorTotal },
-            vendasDinheiro: { increment: valorTotal }
-          }
-        })
       }
 
       // Mark credito as used if provided
@@ -216,7 +203,6 @@ export async function POST(request: NextRequest) {
           where: { id: body.creditoUtilizadoId },
           data: {
             status: 'UTILIZADO',
-            utilizadoEmVendaId: novaVenda.id,
             dataUtilizacao: new Date()
           }
         })

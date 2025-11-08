@@ -27,9 +27,8 @@ export async function POST(
     const troca = await prisma.troca.update({
       where: { id: params.id },
       data: {
-        status: 'RECUSADA',
-        dataRecusa: new Date(),
-        observacoesRecusa: body.observacoesRecusa
+        status: 'RECUSADO',
+        observacoes: body.observacoesRecusa
       }
     })
 

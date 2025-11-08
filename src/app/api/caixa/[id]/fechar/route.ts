@@ -30,21 +30,7 @@ export async function POST(
     }
 
     const caixa = await prisma.caixa.findUnique({
-      where: { id: params.id },
-      include: {
-        vendas: {
-          where: { status: 'FINALIZADA' },
-          select: {
-            valorTotal: true,
-            tipoPagamento: true
-          }
-        },
-        despesas: {
-          select: {
-            valor: true
-          }
-        }
-      }
+      where: { id: params.id }
     })
 
     if (!caixa) {
@@ -55,24 +41,52 @@ export async function POST(
       return errorResponse('Caixa já está fechado', 400)
     }
 
+    // Buscar vendas no período do caixa (dataAbertura -> agora)
+    const vendas = await prisma.venda.findMany({
+      where: {
+        brechoId: caixa.brechoId,
+        status: 'PAGO',
+        dataVenda: {
+          gte: caixa.dataAbertura,
+          lte: new Date()
+        }
+      },
+      select: {
+        total: true,
+        formaPagamento: true
+      }
+    })
+
     // Calculate totals by payment type
-    const vendasDinheiro = caixa.vendas
-      .filter(v => v.tipoPagamento === 'DINHEIRO')
-      .reduce((sum, v) => sum + v.valorTotal, 0)
+    const vendasDinheiro = vendas
+      .filter(v => v.formaPagamento === 'DINHEIRO')
+      .reduce((sum, v) => sum + v.total, 0)
 
-    const vendasCartaoDebito = caixa.vendas
-      .filter(v => v.tipoPagamento === 'CARTAO_DEBITO')
-      .reduce((sum, v) => sum + v.valorTotal, 0)
+    const vendasPix = vendas
+      .filter(v => v.formaPagamento === 'PIX')
+      .reduce((sum, v) => sum + v.total, 0)
 
-    const vendasCartaoCredito = caixa.vendas
-      .filter(v => v.tipoPagamento === 'CARTAO_CREDITO')
-      .reduce((sum, v) => sum + v.valorTotal, 0)
+    const vendasTransferencia = vendas
+      .filter(v => v.formaPagamento === 'TRANSFERENCIA')
+      .reduce((sum, v) => sum + v.total, 0)
 
-    const vendasPix = caixa.vendas
-      .filter(v => v.tipoPagamento === 'PIX')
-      .reduce((sum, v) => sum + v.valorTotal, 0)
+    const vendasCartao = vendas
+      .filter(v => ['CARTAO', 'CARTAO_DEBITO', 'CARTAO_CREDITO'].includes(v.formaPagamento as any))
+      .reduce((sum, v) => sum + v.total, 0)
 
-    const totalDespesas = caixa.despesas.reduce((sum, d) => sum + d.valor, 0)
+    // Despesas do período
+    const despesas = await prisma.despesa.findMany({
+      where: {
+        brechoId: caixa.brechoId,
+        status: 'PAGO',
+        dataPagamento: {
+          gte: caixa.dataAbertura,
+          lte: new Date()
+        }
+      },
+      select: { valor: true }
+    })
+    const totalDespesas = despesas.reduce((sum, d) => sum + d.valor, 0)
 
     const totalSangrias = body.totalSangrias || 0
     const totalReforcos = body.totalReforcos || 0
@@ -93,26 +107,20 @@ export async function POST(
       data: {
         status: 'FECHADO',
         dataFechamento: new Date(),
-        usuarioFechamentoId: body.usuarioFechamentoId,
-        saldoFinal: body.saldoFinal,
+        saldoInformado: body.saldoFinal,
         saldoEsperado,
         diferenca,
         vendasDinheiro,
-        vendasCartaoDebito,
-        vendasCartaoCredito,
+        vendasCartao,
         vendasPix,
+        vendasTransferencia,
         totalDespesas,
         totalSangrias,
         totalReforcos,
-        observacoesFechamento: body.observacoesFechamento
+        observacoes: body.observacoesFechamento
       },
       include: {
-        usuarioAbertura: {
-          select: { id: true, nome: true }
-        },
-        usuarioFechamento: {
-          select: { id: true, nome: true }
-        }
+        operador: { select: { id: true, name: true, email: true } }
       }
     })
 

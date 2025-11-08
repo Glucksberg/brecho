@@ -48,7 +48,7 @@ export default function ConfiguracoesPage() {
 
   // Fetch vendedores when vendedores tab is active
   useEffect(() => {
-    if (activeTab === 'vendedores' && session?.user?.role === 'DONO') {
+    if (activeTab === 'vendedores' && (session as any)?.user?.tipo === 'DONO') {
       fetchVendedores()
     }
   }, [activeTab, session])
@@ -184,7 +184,7 @@ export default function ConfiguracoesPage() {
     { id: 'usuarios', label: 'Usuários', icon: User },
     { id: 'notificacoes', label: 'Notificações', icon: Bell },
     { id: 'seguranca', label: 'Segurança', icon: Lock },
-    ...(session?.user?.role === 'DONO' ? [{ id: 'vendedores', label: 'Vendedores', icon: Users }] : []),
+    ...(((session as any)?.user?.tipo === 'DONO') ? [{ id: 'vendedores', label: 'Vendedores', icon: Users }] : []),
   ]
 
   return (
@@ -400,7 +400,7 @@ export default function ConfiguracoesPage() {
           )}
 
           {/* Vendedores */}
-          {activeTab === 'vendedores' && session?.user?.role === 'DONO' && (
+          {activeTab === 'vendedores' && (session as any)?.user?.tipo === 'DONO' && (
             <div className="space-y-6">
               {/* Messages */}
               {vendedorError && (

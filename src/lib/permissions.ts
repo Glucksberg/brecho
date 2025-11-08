@@ -213,18 +213,6 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     PERMISSIONS.DASHBOARD_ACESSAR,
   ],
 
-  [UserRole.FORNECEDOR]: [
-    // Portal da Fornecedora
-    PERMISSIONS.PORTAL_FORNECEDORA_ACESSAR,
-    PERMISSIONS.PORTAL_FORNECEDORA_RELATORIOS,
-
-    // Visualizar apenas seus produtos
-    PERMISSIONS.PRODUTO_VISUALIZAR,
-
-    // Visualizar créditos
-    PERMISSIONS.FORNECEDORA_VISUALIZAR_CREDITOS,
-  ],
-
   [UserRole.CLIENTE]: [
     // Clientes podem apenas comprar na loja online
     // Não tem acesso ao painel administrativo
@@ -316,7 +304,7 @@ export function hasAdminAccess(user: SessionUser | null): boolean {
  */
 export function canSell(user: SessionUser | null): boolean {
   if (!user) return false
-  return [UserRole.ADMIN, UserRole.DONO, UserRole.VENDEDOR].includes(user.tipo)
+  return user.tipo === UserRole.ADMIN || user.tipo === UserRole.DONO || user.tipo === UserRole.VENDEDOR
 }
 
 /**

@@ -363,9 +363,11 @@ export default function TornarSeFornecedoraPage() {
                   variant="primary"
                   loading={loading}
                   className="flex-1"
-                  rightIcon={<ArrowRight className="w-5 h-5" />}
                 >
-                  Tornar-se Fornecedora
+                  <span className="inline-flex items-center gap-2">
+                    Tornar-se Fornecedora
+                    <ArrowRight className="w-5 h-5" />
+                  </span>
                 </Button>
               </div>
             </form>

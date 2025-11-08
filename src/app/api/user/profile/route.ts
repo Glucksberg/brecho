@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
@@ -6,7 +7,7 @@ import { getServerSession } from '@/lib/auth'
 export async function GET(request: NextRequest) {
   try {
     // Get authenticated user session
-    const session = await getServerSession()
+    const session = (await getServerSession()) as any
 
     if (!session || !session.user) {
       return NextResponse.json(
@@ -49,7 +50,7 @@ export async function GET(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     // Get authenticated user session
-    const session = await getServerSession()
+    const session = (await getServerSession()) as any
 
     if (!session || !session.user) {
       return NextResponse.json(
@@ -81,7 +82,7 @@ export async function PUT(request: NextRequest) {
       }
     })
 
-    logger.info('User profile updated', { userId: session.user.id })
+    logger.info('User profile updated', { userId: (session as any).user.id })
 
     return NextResponse.json({
       message: 'Perfil atualizado com sucesso',

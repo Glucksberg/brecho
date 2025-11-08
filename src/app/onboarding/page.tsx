@@ -28,10 +28,10 @@ export default function OnboardingPage() {
   })
 
   useEffect(() => {
-    if (session?.user?.brechoId) {
+    if ((session as any)?.user?.brechoId) {
       router.replace('/dashboard')
     }
-  }, [session?.user?.brechoId, router])
+  }, [session?.user, router])
 
   useEffect(() => {
     setForm((f) => ({ ...f, slugPreview: slugify(f.nome || 'meu-brecho') }))

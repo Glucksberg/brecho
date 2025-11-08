@@ -9,7 +9,9 @@ export interface TextareaProps extends React.TextareaHTMLAttributes<HTMLTextArea
 
 const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
   ({ className, label, error, helperText, ...props }, ref) => {
-    const textareaId = props.id || props.name || `textarea-${Math.random().toString(36).substr(2, 9)}`
+    // Use React 18's useId() for stable IDs that match between server and client
+    const generatedId = React.useId()
+    const textareaId = props.id || props.name || generatedId
 
     return (
       <div className="w-full">

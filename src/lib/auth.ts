@@ -2,7 +2,7 @@ import { NextAuthOptions, getServerSession as nextAuthGetServerSession } from 'n
 import { PrismaAdapter } from '@next-auth/prisma-adapter'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import { prisma } from './prisma'
-import { compare } from 'bcryptjs'
+const bcrypt = require('bcryptjs')
 import { logger } from './logger'
 import type { SessionUser } from '@/types'
 import { UserRole } from '@prisma/client'
@@ -249,11 +249,11 @@ export const authOptions: NextAuthOptions = {
       // Initial sign in
       if (user) {
         token.id = user.id
-        token.role = user.role
-        token.brechoId = user.brechoId
-        token.fornecedoraId = user.fornecedoraId
-        token.avatar = user.avatar
-        token.permissoes = user.permissoes || []
+        token.role = (user as any).role
+        token.brechoId = (user as any).brechoId
+        token.fornecedoraId = (user as any).fornecedoraId
+        token.avatar = (user as any).avatar
+        token.permissoes = (user as any).permissoes || []
         // @ts-ignore
         if ((user as any).username) {
           // @ts-ignore
@@ -337,7 +337,7 @@ export async function requireAuth() {
 export async function requireAdminAuth() {
   const session = await requireAuth()
 
-  if (session.user.tipo !== UserRole.ADMIN && session.user.tipo !== UserRole.DONO) {
+  if ((session as any).user.tipo !== UserRole.ADMIN && (session as any).user.tipo !== UserRole.DONO) {
     throw new Error('Acesso negado: requer permissões de administrador')
   }
 
@@ -351,12 +351,12 @@ export async function requireBrechoAccess(brechoId: string) {
   const session = await requireAuth()
 
   // Admin pode acessar qualquer brechó
-  if (session.user.tipo === UserRole.ADMIN) {
+  if ((session as any).user.tipo === UserRole.ADMIN) {
     return session
   }
 
   // Outros usuários só podem acessar seu próprio brechó
-  if (session.user.brechoId !== brechoId) {
+  if ((session as any).user.brechoId !== brechoId) {
     throw new Error('Acesso negado: você não tem permissão para acessar este brechó')
   }
 

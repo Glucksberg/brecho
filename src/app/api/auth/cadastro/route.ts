@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { hash } from 'bcryptjs'
+const bcrypt = require('bcryptjs')
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
 import { z } from 'zod'
@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Hash password
-    const passwordHash = await hash(validated.password, 12)
+    const passwordHash = await bcrypt.hash(validated.password, 12)
 
     // Get first Brecho (multi-tenant support)
     const brecho = await prisma.brecho.findFirst()

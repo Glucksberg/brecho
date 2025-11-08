@@ -1,6 +1,7 @@
 'use client'
+export const dynamic = 'force-dynamic'
 
-import { useEffect } from 'react'
+import { useEffect, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { LojaLayout } from '@/components/layout'
 import { Card, CardContent, Button } from '@/components/ui'
@@ -8,7 +9,7 @@ import { CheckCircle, Package, Mail } from 'lucide-react'
 import Link from 'next/link'
 import { useCart } from '@/contexts/CartContext'
 
-export default function CheckoutSucessoPage() {
+function CheckoutSucessoPageInner() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const { clearCart } = useCart()
@@ -133,5 +134,13 @@ export default function CheckoutSucessoPage() {
         </div>
       </div>
     </LojaLayout>
+  )
+}
+
+export default function CheckoutSucessoPage() {
+  return (
+    <Suspense fallback={null}>
+      <CheckoutSucessoPageInner />
+    </Suspense>
   )
 }

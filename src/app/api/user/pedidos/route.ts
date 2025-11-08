@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
@@ -37,7 +38,7 @@ export async function GET(request: NextRequest) {
         dataVenda: 'desc'
       },
       include: {
-        items: {
+        itens: {
           include: {
             produto: {
               select: {
@@ -58,9 +59,9 @@ export async function GET(request: NextRequest) {
       numero: `#${venda.id.substring(0, 6).toUpperCase()}`,
       data: venda.dataVenda.toISOString().split('T')[0],
       status: venda.status,
-      total: venda.valorTotal,
-      itens: venda.items.length,
-      items: venda.items.map(item => ({
+      total: venda.total,
+      itens: venda.itens.length,
+      items: venda.itens.map(item => ({
         id: item.id,
         produto: item.produto,
         quantidade: item.quantidade,

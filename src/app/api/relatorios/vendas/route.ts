@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic'
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { successResponse, errorResponse, handleApiError } from '@/lib/api-helpers'
@@ -57,8 +58,8 @@ export async function GET(request: NextRequest) {
     const vendas = await prisma.venda.findMany({
       where: {
         brechoId,
-        status: 'FINALIZADA',
-        dataCriacao: {
+        status: 'PAGO',
+        dataVenda: {
           gte: inicio,
           lte: fim
         }
@@ -78,28 +79,28 @@ export async function GET(request: NextRequest) {
     })
 
     // Cálculos
-    const totalVendas = vendas.reduce((sum, v) => sum + v.valorTotal, 0)
+    const totalVendas = vendas.reduce((sum, v) => sum + v.total, 0)
     const quantidadeVendas = vendas.length
     const ticketMedio = quantidadeVendas > 0 ? totalVendas / quantidadeVendas : 0
 
     // Vendas por dia
     const vendasPorDia = vendas.reduce((acc, venda) => {
-      const dia = venda.dataCriacao.toISOString().split('T')[0]
+      const dia = venda.dataVenda.toISOString().split('T')[0]
       if (!acc[dia]) {
         acc[dia] = { data: new Date(dia), total: 0, quantidade: 0 }
       }
-      acc[dia].total += venda.valorTotal
+      acc[dia].total += venda.total
       acc[dia].quantidade += 1
       return acc
     }, {} as Record<string, VendaDia>)
 
     // Vendas por forma de pagamento
     const vendasPorFormaPagamento = vendas.reduce((acc, venda) => {
-      const tipo = venda.metodoPagamento || 'OUTROS'
+      const tipo = (venda.formaPagamento as string) || 'OUTROS'
       if (!acc[tipo]) {
         acc[tipo] = { tipo, total: 0, quantidade: 0, percentual: 0 }
       }
-      acc[tipo].total += venda.valorTotal
+      acc[tipo].total += venda.total
       acc[tipo].quantidade += 1
       return acc
     }, {} as Record<string, VendaFormaPagamento>)
@@ -122,10 +123,10 @@ export async function GET(request: NextRequest) {
           comissao: 0
         }
       }
-      acc[vendedorId].total += venda.valorTotal
+      acc[vendedorId].total += venda.total
       acc[vendedorId].quantidade += 1
       // Calculate commission based on vendedor.comissao percentage
-      const comissaoVenda = venda.valorTotal * (venda.vendedor.comissao / 100)
+      const comissaoVenda = venda.total * (venda.vendedor.comissao / 100)
       acc[vendedorId].comissao += comissaoVenda
       return acc
     }, {} as Record<string, VendaVendedor>)

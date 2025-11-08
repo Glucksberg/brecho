@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
         where,
         skip,
         take,
-        orderBy: { dataCriacao: 'desc' },
+        orderBy: { createdAt: 'desc' },
         include: {
           fornecedora: {
             select: {
@@ -103,6 +103,11 @@ export async function POST(request: NextRequest) {
     const produto = await prisma.produto.create({
       data: {
         nome: body.nome,
+        slug: body.nome
+          .toLowerCase()
+          .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/(^-|-$)+/g, ''),
         descricao: body.descricao,
         preco: body.preco,
         categoria: body.categoria,
@@ -116,9 +121,11 @@ export async function POST(request: NextRequest) {
         brechoId: body.brechoId,
         imagens: body.imagens || [],
         peso: body.peso,
-        altura: body.altura,
-        largura: body.largura,
-        profundidade: body.profundidade
+        dimensoes: (body.altura || body.largura || body.profundidade) ? {
+          altura: body.altura,
+          largura: body.largura,
+          profundidade: body.profundidade
+        } : undefined
       },
       include: {
         fornecedora: {

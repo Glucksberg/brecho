@@ -1,12 +1,13 @@
 'use client'
+export const dynamic = 'force-dynamic'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Card, CardHeader, CardTitle, CardContent, Button, Input } from '@/components/ui'
 import { Lock, Check } from 'lucide-react'
 
-export default function RedefinirSenhaPage() {
+function RedefinirSenhaPageInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const token = searchParams.get('token')
@@ -227,5 +228,13 @@ export default function RedefinirSenhaPage() {
         </Card>
       </div>
     </div>
+  )
+}
+
+export default function RedefinirSenhaPage() {
+  return (
+    <Suspense fallback={null}>
+      <RedefinirSenhaPageInner />
+    </Suspense>
   )
 }
