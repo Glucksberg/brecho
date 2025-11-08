@@ -1,5 +1,5 @@
 import { PrismaClient, UserRole } from '@prisma/client'
-import * as bcrypt from 'bcryptjs'
+const bcrypt = require('bcryptjs')
 
 const prisma = new PrismaClient()
 
@@ -43,6 +43,7 @@ async function main() {
     update: {},
     create: {
       name: 'Administrador Sistema',
+      username: 'admin',
       email: 'admin@retrocarolis.com.br',
       password: hashedPassword,
       role: UserRole.ADMIN,
@@ -53,7 +54,7 @@ async function main() {
       permissoes: []
     }
   })
-  console.log(`✅ ADMIN criado: ${admin.email}`)
+  console.log(`✅ ADMIN criado: ${admin.email} (username: ${admin.username})`)
 
   // DONO - Proprietário do brechó
   const dono = await prisma.user.upsert({
@@ -61,6 +62,7 @@ async function main() {
     update: {},
     create: {
       name: 'Carolina Oliveira',
+      username: 'dono',
       email: 'dono@retrocarolis.com.br',
       password: hashedPassword,
       role: UserRole.DONO,
@@ -71,7 +73,7 @@ async function main() {
       permissoes: []
     }
   })
-  console.log(`✅ DONO criado: ${dono.email}`)
+  console.log(`✅ DONO criado: ${dono.email} (username: ${dono.username})`)
 
   // VENDEDOR - Funcionário
   const vendedor = await prisma.user.upsert({
@@ -79,6 +81,7 @@ async function main() {
     update: {},
     create: {
       name: 'Maria Silva',
+      username: 'vendedor',
       email: 'vendedor@retrocarolis.com.br',
       password: hashedPassword,
       role: UserRole.VENDEDOR,
@@ -89,7 +92,7 @@ async function main() {
       permissoes: []
     }
   })
-  console.log(`✅ VENDEDOR criado: ${vendedor.email}`)
+  console.log(`✅ VENDEDOR criado: ${vendedor.email} (username: ${vendedor.username})`)
 
   // 3. Criar Fornecedoras
   console.log('👗 Criando fornecedoras...')
@@ -130,25 +133,28 @@ async function main() {
   console.log('👤 Criando clientes...')
 
   // CLIENTE comum - Apenas acessa a loja
-  const clienteRecord = await prisma.cliente.upsert({
+  // Verifica se já existe antes de criar
+  let clienteRecord = await prisma.cliente.findFirst({
     where: {
-      email_brechoId: {
-        email: 'cliente@email.com',
-        brechoId: brecho.id
-      }
-    },
-    update: {},
-    create: {
-      nome: 'João Cliente',
       email: 'cliente@email.com',
-      telefone: '(11) 98888-8888',
-      cpf: '123.456.789-00',
-      brechoId: brecho.id,
-      ativo: true,
-      totalCompras: 0,
-      numeroCompras: 0
+      brechoId: brecho.id
     }
   })
+  
+  if (!clienteRecord) {
+    clienteRecord = await prisma.cliente.create({
+      data: {
+        nome: 'João Cliente',
+        email: 'cliente@email.com',
+        telefone: '(11) 98888-8888',
+        cpf: '123.456.789-00',
+        brechoId: brecho.id,
+        ativo: true,
+        totalCompras: 0,
+        numeroCompras: 0
+      }
+    })
+  }
 
   const clienteUser = await prisma.user.upsert({
     where: { email: 'cliente@email.com' },
@@ -169,25 +175,28 @@ async function main() {
   console.log(`✅ CLIENTE criado: ${clienteUser.email} (cliente comum)`)
 
   // CLIENTE que é FORNECEDORA - Acessa loja E portal de fornecedoras
-  const clienteFornecedoraRecord = await prisma.cliente.upsert({
+  // Verifica se já existe antes de criar
+  let clienteFornecedoraRecord = await prisma.cliente.findFirst({
     where: {
-      email_brechoId: {
-        email: 'ana@email.com',
-        brechoId: brecho.id
-      }
-    },
-    update: {},
-    create: {
-      nome: 'Ana Paula Santos',
       email: 'ana@email.com',
-      telefone: '(11) 97777-7777',
-      cpf: '987.654.321-00',
-      brechoId: brecho.id,
-      ativo: true,
-      totalCompras: 0,
-      numeroCompras: 0
+      brechoId: brecho.id
     }
   })
+  
+  if (!clienteFornecedoraRecord) {
+    clienteFornecedoraRecord = await prisma.cliente.create({
+      data: {
+        nome: 'Ana Paula Santos',
+        email: 'ana@email.com',
+        telefone: '(11) 97777-7777',
+        cpf: '987.654.321-00',
+        brechoId: brecho.id,
+        ativo: true,
+        totalCompras: 0,
+        numeroCompras: 0
+      }
+    })
+  }
 
   const clienteFornecedora = await prisma.user.upsert({
     where: { email: 'ana@email.com' },

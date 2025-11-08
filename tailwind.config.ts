@@ -9,6 +9,9 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        background: 'hsl(var(--background))',
+        foreground: 'hsl(var(--foreground))',
+        border: 'hsl(var(--border))',
         primary: {
           50: '#f0fdf4',
           100: '#dcfce7',
@@ -21,6 +24,9 @@ const config: Config = {
           800: '#166534',
           900: '#14532d',
         },
+      },
+      borderColor: {
+        DEFAULT: 'hsl(var(--border))',
       },
     },
   },

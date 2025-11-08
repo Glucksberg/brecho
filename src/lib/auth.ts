@@ -8,6 +8,47 @@ import type { SessionUser } from '@/types'
 import { UserRole } from '@prisma/client'
 
 /**
+ * Login via Portal de Licenças (CloudFarm)
+ * Documentação recebida (2025-11-08)
+ * - Endpoint: POST https://licensas.cloudfarm.ai/login-retrocarolis.php
+ * - Body: { username, password, device_info? }
+ * - Sucesso: { status: 'success', user_info, license_info, session { token, session_id, expires_at } }
+ * - Erros: status 'error' | 'denied' | 'expired'
+ */
+async function loginWithLicensePortal(username: string, password: string) {
+  const url =
+    process.env.LICENSE_PORTAL_LOGIN_URL ||
+    'https://licensas.cloudfarm.ai/login-retrocarolis.php'
+
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      // device_info é opcional; portal gera se ausente
+      body: JSON.stringify({
+        username,
+        password,
+        device_info: {
+          device_type: 'web'
+        }
+      }),
+      cache: 'no-store'
+    })
+
+    // Pode retornar 200 com status lógico no JSON
+    const data = await res.json().catch(() => ({}))
+    return { ok: res.ok, data }
+  } catch (error: any) {
+    logger.error('License portal login request failed', {
+      error: error?.message
+    })
+    return { ok: false, data: null, error }
+  }
+}
+
+/**
  * NextAuth Configuration
  * Sistema de autenticação para Retrô Carólis
  *
@@ -27,56 +68,76 @@ export const authOptions: NextAuthOptions = {
     CredentialsProvider({
       name: 'Credentials',
       credentials: {
-        email: { label: 'Email', type: 'email' },
+        username: { label: 'Usuário', type: 'text' },
         password: { label: 'Senha', type: 'password' }
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
-          throw new Error('Email e senha são obrigatórios')
-        }
-
-        // Busca usuário no banco
-        const user = await prisma.user.findUnique({
-          where: { email: credentials.email },
-          include: {
-            brecho: true,
-            fornecedora: true
+        try {
+          console.log('[AUTH] Starting authorization', { username: credentials?.username, hasPassword: !!credentials?.password })
+          if (!credentials?.username || !credentials?.password) {
+            console.log('[AUTH] Missing credentials')
+            throw new Error('Usuário e senha são obrigatórios')
           }
-        })
 
-        if (!user) {
-          throw new Error('Credenciais inválidas')
-        }
+          // 1) Tentar autenticar via Portal de Licenças
+          console.log('[AUTH] Attempting license portal auth', { username: credentials.username })
+          const portal = await loginWithLicensePortal(credentials.username, credentials.password)
 
-        if (!user.ativo) {
-          throw new Error('Usuário inativo. Entre em contato com o administrador.')
-        }
+          if (portal.ok && portal.data) {
+            const status = portal.data?.status
+            if (status === 'success') {
+              // Sucesso no portal - usuário MASTER autorizado pelo portal
+              const displayName = portal.data?.user_info?.display_name || credentials.username
+              const email = portal.data?.user_info?.email || undefined
+              const portalToken = portal.data?.session?.token as string | undefined
+              const portalSessionId = portal.data?.session?.session_id as string | undefined
 
-        // Verify password
-        if (!user.password) {
-          logger.error('User has no password set', { userId: user.id, email: user.email })
-          throw new Error('Credenciais inválidas')
-        }
+              console.log('[AUTH] License portal success', { username: credentials.username })
+              logger.info('License portal auth success', { username: credentials.username })
 
-        const isPasswordValid = await compare(credentials.password, user.password)
+              return {
+                id: `portal:${credentials.username}`,
+                name: displayName,
+                email,
+                role: UserRole.DONO, // Mapeando MASTER -> DONO local
+                brechoId: undefined,
+                fornecedoraId: undefined,
+                avatar: undefined,
+                permissoes: [],
+                // campos extras transportados via jwt callback
+                portalToken,
+                portalSessionId
+              } as any
+            }
 
-        if (!isPasswordValid) {
-          logger.warn('Invalid password attempt', { email: user.email })
-          throw new Error('Credenciais inválidas')
-        }
+            // Tratar respostas conhecidas
+            if (status === 'denied') {
+              throw new Error('Acesso negado: disponível apenas para usuários MASTER')
+            }
+            if (status === 'expired') {
+              throw new Error('Licença expirada. Contate o suporte para renovar.')
+            }
+            if (status === 'error') {
+              const message = portal.data?.message || 'Erro de autenticação'
+              throw new Error(message)
+            }
 
-        logger.info('User authenticated successfully', { userId: user.id, email: user.email })
+            // Status inesperado
+            throw new Error('Falha na autenticação pelo portal de licenças')
+          }
 
-        // Return authenticated user
-        return {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          role: user.role,
-          brechoId: user.brechoId,
-          fornecedoraId: user.fornecedoraId,
-          avatar: user.image,
-          permissoes: user.permissoes
+          // 2) Sem fallback: portal obrigatório para validar assinatura ativa
+          throw new Error('Serviço de licenças indisponível. Tente novamente.')
+        } catch (error: any) {
+          console.error('[AUTH] Authentication error', {
+            error: error?.message,
+            username: credentials?.username
+          })
+          logger.error('Authentication error', {
+            error: error?.message,
+            username: credentials?.username
+          })
+          throw error
         }
       }
     })
@@ -103,6 +164,17 @@ export const authOptions: NextAuthOptions = {
         token.fornecedoraId = user.fornecedoraId
         token.avatar = user.avatar
         token.permissoes = user.permissoes || []
+        // Transportar dados do portal de licenças quando presentes
+        // @ts-ignore
+        if ((user as any).portalToken) {
+          // @ts-ignore
+          token.portalToken = (user as any).portalToken
+        }
+        // @ts-ignore
+        if ((user as any).portalSessionId) {
+          // @ts-ignore
+          token.portalSessionId = (user as any).portalSessionId
+        }
       }
 
       // Update session (when using update() from useSession)
@@ -127,6 +199,14 @@ export const authOptions: NextAuthOptions = {
         }
 
         session.user = sessionUser
+        // Expor também dados do portal de licenças na sessão
+        // @ts-ignore
+        session.licensePortal = {
+          // @ts-ignore
+          token: token.portalToken as string | undefined,
+          // @ts-ignore
+          sessionId: token.portalSessionId as string | undefined
+        }
       }
 
       return session

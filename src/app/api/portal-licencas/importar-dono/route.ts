@@ -28,8 +28,8 @@ const importDonoSchema = z.object({
   // Dados do dono
   dono: z.object({
     name: z.string().min(1),
-    email: z.string().email(),
-    password: z.string().min(8), // Já vem hasheado do portal?
+    login: z.string().min(3), // Username para login administrativo (obrigatório)
+    password: z.string().min(8), // Senha
     telefone: z.string().optional(),
     cpf: z.string().optional()
   }),
@@ -64,60 +64,56 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const data = importDonoSchema.parse(body)
 
-    // Verificar se brechó já existe
-    const brechoExistente = await prisma.brecho.findUnique({
-      where: { slug: data.brecho.slug }
+    // Verificar se username já existe
+    const usernameExistente = await prisma.user.findUnique({
+      where: { username: data.dono.login }
     })
 
-    if (brechoExistente) {
+    if (usernameExistente) {
       return NextResponse.json(
-        { error: 'Brechó já existe', slug: data.brecho.slug },
-        { status: 409 }
-      )
-    }
-
-    // Verificar se email do dono já existe
-    const donoExistente = await prisma.user.findUnique({
-      where: { email: data.dono.email }
-    })
-
-    if (donoExistente) {
-      return NextResponse.json(
-        { error: 'Email já cadastrado', email: data.dono.email },
+        { error: 'Username já cadastrado', username: data.dono.login },
         { status: 409 }
       )
     }
 
     // Criar brechó e dono em transação
     const result = await prisma.$transaction(async (tx) => {
-      // 1. Criar Brechó
-      const brecho = await tx.brecho.create({
-        data: {
-          nome: data.brecho.nome,
-          slug: data.brecho.slug,
-          dominio: data.brecho.dominio,
-          email: data.brecho.email,
-          telefone: data.brecho.telefone,
-          cor: data.brecho.cor,
-          logo: data.brecho.logo,
-          ativo: true
-        }
+      // 1. Verificar se brechó já existe ou criar novo
+      let brechoFinal = await tx.brecho.findUnique({
+        where: { slug: data.brecho.slug }
       })
 
-      // 2. Hash da senha se ainda não estiver
-      // Assumindo que o portal envia senha em texto plano por segurança do canal
+      if (!brechoFinal) {
+        // Criar novo brechó
+        brechoFinal = await tx.brecho.create({
+          data: {
+            nome: data.brecho.nome,
+            slug: data.brecho.slug,
+            dominio: data.brecho.dominio,
+            email: data.brecho.email,
+            telefone: data.brecho.telefone,
+            cor: data.brecho.cor,
+            logo: data.brecho.logo,
+            ativo: true
+          }
+        })
+      }
+
+      // 2. Hash da senha
       const hashedPassword = await hash(data.dono.password, 10)
 
       // 3. Criar usuário DONO
+      // O login do Portal é o username para login administrativo
       const dono = await tx.user.create({
         data: {
           name: data.dono.name,
-          email: data.dono.email,
+          username: data.dono.login, // Login do Portal = username
+          email: `${data.dono.login}@${data.brecho.slug}.local`, // Email temporário (não usado para login)
           password: hashedPassword,
           telefone: data.dono.telefone,
           cpf: data.dono.cpf,
           role: 'DONO',
-          brechoId: brecho.id,
+          brechoId: brechoFinal.id,
           ativo: true,
           comissao: 0,
           metaMensal: 0,
@@ -125,13 +121,13 @@ export async function POST(request: NextRequest) {
         }
       })
 
-      return { brecho, dono }
+      return { brecho: brechoFinal, dono }
     })
 
     logger.info('DONO imported from license portal', {
       brechoId: result.brecho.id,
       donoId: result.dono.id,
-      email: result.dono.email,
+      username: result.dono.username, // Login do Portal
       licencaId: data.licenca?.id
     })
 
@@ -146,7 +142,7 @@ export async function POST(request: NextRequest) {
       dono: {
         id: result.dono.id,
         name: result.dono.name,
-        email: result.dono.email
+        username: result.dono.username // Login do Portal
       }
     }, { status: 201 })
 
@@ -192,7 +188,7 @@ export async function GET(request: NextRequest) {
       },
       dono: {
         name: 'string (required)',
-        email: 'string (required, unique)',
+        login: 'string (required, min 3 chars) - Username para login administrativo',
         password: 'string (required, min 8 chars)',
         telefone: 'string (optional)',
         cpf: 'string (optional)'
@@ -208,7 +204,7 @@ export async function GET(request: NextRequest) {
       201: 'Conta criada com sucesso',
       400: 'Dados inválidos',
       401: 'API Key ausente ou inválida',
-      409: 'Brechó ou email já existe',
+      409: 'Username já existe',
       500: 'Erro interno'
     }
   })

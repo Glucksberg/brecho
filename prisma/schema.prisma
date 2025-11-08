@@ -60,6 +60,7 @@ enum UserRole {
 model User {
   id            String    @id @default(cuid())
   name          String?
+  username      String?   @unique // Username para login administrativo
   email         String    @unique
   emailVerified DateTime?
   image         String?
@@ -115,6 +116,7 @@ model User {
   trocasAnalisadas Troca[] @relation("analisadoPor")
 
   @@index([email])
+  @@index([username])
   @@index([brechoId])
   @@index([role])
   @@map("users")

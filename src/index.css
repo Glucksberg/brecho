@@ -19,7 +19,7 @@
 /* Base styles */
 @layer base {
   * {
-    @apply border-border;
+    @apply border-border/20;
   }
   
   body {

@@ -5,14 +5,14 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { signIn } from 'next-auth/react'
 import { Input, Button, Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui'
-import { Mail, Lock } from 'lucide-react'
+import { User, Lock } from 'lucide-react'
 
 export default function LoginPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState({
-    email: '',
+    username: '',
     password: ''
   })
   const [error, setError] = useState('')
@@ -24,13 +24,13 @@ export default function LoginPage() {
 
     try {
       const result = await signIn('credentials', {
-        email: formData.email,
+        username: formData.username,
         password: formData.password,
         redirect: false
       })
 
       if (result?.error) {
-        setError('Email ou senha inválidos')
+        setError('Usuário ou senha inválidos')
         return
       }
 
@@ -75,12 +75,12 @@ export default function LoginPage() {
               )}
 
               <Input
-                label="E-mail"
-                type="email"
-                placeholder="seu@email.com"
-                leftIcon={<Mail className="w-5 h-5" />}
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                label="Usuário"
+                type="text"
+                placeholder="seu_usuario"
+                leftIcon={<User className="w-5 h-5" />}
+                value={formData.username}
+                onChange={(e) => setFormData({ ...formData, username: e.target.value })}
                 required
               />
 
@@ -140,9 +140,9 @@ export default function LoginPage() {
         <div className="mt-6 p-4 bg-white rounded-lg border border-gray-200">
           <p className="text-xs font-medium text-gray-600 mb-2">Credenciais de teste:</p>
           <div className="space-y-1 text-xs text-gray-500">
-            <p>Admin: admin@retrocarolis.com / senha123</p>
-            <p>Vendedor: vendedor@retrocarolis.com / senha123</p>
-            <p>Fornecedor: fornecedor@retrocarolis.com / senha123</p>
+            <p>Admin: admin / admin123</p>
+            <p>Dono: dono / admin123</p>
+            <p>Vendedor: vendedor / admin123</p>
           </div>
         </div>
       </div>

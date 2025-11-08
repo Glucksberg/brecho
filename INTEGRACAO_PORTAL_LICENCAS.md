@@ -66,7 +66,7 @@ X-License-Portal-Key: <api-key>
   },
   "dono": {
     "name": "Carolina Oliveira",
-    "email": "dono@retrocarolis.com.br",
+    "login": "retrocarolis", // Username para login administrativo (obrigatório)
     "password": "SenhaSegura123",
     "telefone": "(11) 98888-8888",
     "cpf": "123.456.789-00"
@@ -88,7 +88,7 @@ X-License-Portal-Key: <api-key>
 
 **dono:**
 - `name` (string): Nome completo do dono
-- `email` (string): Email (único)
+- `login` (string): Username para login administrativo (obrigatório, mínimo 3 caracteres)
 - `password` (string): Senha (mínimo 8 caracteres)
 
 #### Campos Opcionais
@@ -121,7 +121,7 @@ X-License-Portal-Key: <api-key>
   "dono": {
     "id": "clxxx...",
     "name": "Carolina Oliveira",
-    "email": "dono@retrocarolis.com.br"
+    "username": "retrocarolis" // Login do Portal
   }
 }
 ```
@@ -155,8 +155,8 @@ ou
 
 ```json
 {
-  "error": "Email já cadastrado",
-  "email": "dono@retrocarolis.com.br"
+  "error": "Username já cadastrado",
+  "username": "retrocarolis"
 }
 ```
 
