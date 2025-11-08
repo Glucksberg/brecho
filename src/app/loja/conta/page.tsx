@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useSession } from 'next-auth/react'
+import { useSession, signOut } from 'next-auth/react'
 import { LojaLayout } from '@/components/layout'
 import { Card, CardHeader, CardTitle, CardContent, Button, Input, Badge } from '@/components/ui'
 import { User, Mail, Phone, MapPin, Lock, Package, Heart, CreditCard, LogOut, Store, ArrowRight, Sparkles } from 'lucide-react'
@@ -11,16 +11,150 @@ import { useRouter } from 'next/navigation'
 
 type Tab = 'perfil' | 'pedidos' | 'favoritos' | 'endereco' | 'senha'
 
+/**
+ * Formata telefone brasileiro no formato (XX)XXXXX-XXXX enquanto digita
+ */
+function formatPhoneInput(value: string): string {
+  // Remove tudo que não é número
+  const numbers = value.replace(/\D/g, '')
+  
+  // Limita a 11 dígitos (DDD + 9 dígitos)
+  const limited = numbers.slice(0, 11)
+  
+  // Aplica a formatação
+  if (limited.length <= 2) {
+    return limited.length > 0 ? `(${limited}` : ''
+  } else if (limited.length <= 7) {
+    return `(${limited.slice(0, 2)})${limited.slice(2)}`
+  } else {
+    return `(${limited.slice(0, 2)})${limited.slice(2, 7)}-${limited.slice(7)}`
+  }
+}
+
 export default function MinhaContaPage() {
   const router = useRouter()
   const { data: session } = useSession()
   const [activeTab, setActiveTab] = useState<Tab>('perfil')
   const [loading, setLoading] = useState(false)
   const [canBecomeFornecedora, setCanBecomeFornecedora] = useState(false)
+  const [usuario, setUsuario] = useState<any>(null)
+  const [pedidos, setPedidos] = useState<any[]>([])
+  const [loadingData, setLoadingData] = useState(true)
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    telefone: '',
+    endereco: {
+      cep: '',
+      rua: '',
+      numero: '',
+      complemento: '',
+      bairro: '',
+      cidade: '',
+      estado: ''
+    }
+  })
+
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (session === null) {
+      router.push('/loja/login?callbackUrl=/loja/conta')
+    }
+  }, [session, router])
 
   useEffect(() => {
-    checkFornecedoraStatus()
+    if (session?.user) {
+      fetchUserData()
+      fetchPedidos()
+      checkFornecedoraStatus()
+    }
   }, [session])
+
+  const fetchUserData = async () => {
+    try {
+      const response = await fetch('/api/user/profile')
+      
+      // Verificar se a resposta é JSON antes de fazer parse
+      const contentType = response.headers.get('content-type')
+      if (!contentType || !contentType.includes('application/json')) {
+        // Se não for JSON, provavelmente foi redirecionado para login
+        if (response.status === 401 || response.redirected) {
+          router.push('/loja/login?callbackUrl=/loja/conta')
+          return
+        }
+        throw new Error('Resposta inválida do servidor')
+      }
+      
+      if (response.ok) {
+        const data = await response.json()
+        setUsuario(data.usuario)
+        if (data.usuario) {
+          // Formatar telefone ao carregar (se existir)
+          const telefoneFormatado = data.usuario.telefone 
+            ? formatPhoneInput(data.usuario.telefone) 
+            : ''
+          
+          setFormData({
+            name: data.usuario.name || '',
+            email: data.usuario.email || '',
+            telefone: telefoneFormatado,
+            endereco: data.usuario.endereco || {
+              cep: '',
+              rua: '',
+              numero: '',
+              complemento: '',
+              bairro: '',
+              cidade: '',
+              estado: ''
+            }
+          })
+        }
+      } else {
+        const errorData = await response.json().catch(() => ({ error: 'Erro desconhecido' }))
+        if (response.status === 401) {
+          router.push('/loja/login?callbackUrl=/loja/conta')
+        } else {
+          console.error('Erro ao buscar dados do usuário:', errorData)
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao buscar dados do usuário:', error)
+    } finally {
+      setLoadingData(false)
+    }
+  }
+
+  const fetchPedidos = async () => {
+    try {
+      const response = await fetch('/api/user/pedidos')
+      
+      // Verificar se a resposta é JSON antes de fazer parse
+      const contentType = response.headers.get('content-type')
+      if (!contentType || !contentType.includes('application/json')) {
+        // Se não for JSON, provavelmente foi redirecionado para login
+        if (response.status === 401 || response.redirected) {
+          return // Não redirecionar novamente, já foi feito em fetchUserData
+        }
+        return // Silenciosamente falhar se não for JSON
+      }
+      
+      if (response.ok) {
+        const data = await response.json()
+        setPedidos(data.pedidos || [])
+      } else {
+        const errorData = await response.json().catch(() => ({ error: 'Erro desconhecido' }))
+        if (response.status !== 401) {
+          console.error('Erro ao buscar pedidos:', errorData)
+        }
+      }
+    } catch (error) {
+      // Ignorar erros de parse JSON (provavelmente HTML de redirecionamento)
+      if (error instanceof SyntaxError && error.message.includes('JSON')) {
+        return // Silenciosamente ignorar erros de parse JSON
+      }
+      console.error('Erro ao buscar pedidos:', error)
+    }
+  }
 
   const checkFornecedoraStatus = async () => {
     try {
@@ -31,51 +165,6 @@ export default function MinhaContaPage() {
       // Silently fail
     }
   }
-
-  // Mock user data
-  const usuario = {
-    nome: 'Maria Silva',
-    email: 'maria@example.com',
-    telefone: '(11) 98765-4321',
-    cpf: '123.456.789-00',
-    endereco: {
-      rua: 'Rua das Flores',
-      numero: '123',
-      complemento: 'Apto 45',
-      bairro: 'Centro',
-      cidade: 'São Paulo',
-      estado: 'SP',
-      cep: '01234-567'
-    }
-  }
-
-  // Mock orders
-  const pedidos = [
-    {
-      id: '1',
-      numero: '#001234',
-      data: '2024-01-15',
-      status: 'ENTREGUE',
-      total: 349.80,
-      itens: 3
-    },
-    {
-      id: '2',
-      numero: '#001235',
-      data: '2024-01-10',
-      status: 'EM_TRANSITO',
-      total: 189.90,
-      itens: 1
-    },
-    {
-      id: '3',
-      numero: '#001236',
-      data: '2024-01-05',
-      status: 'PROCESSANDO',
-      total: 279.70,
-      itens: 2
-    }
-  ]
 
   const getStatusBadge = (status: string) => {
     const badges: Record<string, { label: string; color: 'success' | 'warning' | 'primary' | 'danger' }> = {
@@ -97,16 +186,78 @@ export default function MinhaContaPage() {
 
   const handleSalvar = async () => {
     setLoading(true)
-    // TODO: Implement save
-    setTimeout(() => {
+    try {
+      const formDataToSend: any = {}
+      
+      // Coletar dados do formulário baseado na aba ativa
+      if (activeTab === 'perfil') {
+        formDataToSend.name = formData.name
+        formDataToSend.email = formData.email
+        formDataToSend.telefone = formData.telefone
+      } else if (activeTab === 'endereco') {
+        formDataToSend.endereco = formData.endereco
+      }
+
+      const response = await fetch('/api/user/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formDataToSend)
+      })
+
+      if (response.ok) {
+        await fetchUserData()
+        alert('Dados salvos com sucesso!')
+      } else {
+        const data = await response.json()
+        alert(data.error || 'Erro ao salvar dados')
+      }
+    } catch (error) {
+      alert('Erro ao salvar dados. Tente novamente.')
+    } finally {
       setLoading(false)
-      alert('Dados salvos com sucesso!')
-    }, 1000)
+    }
   }
 
-  const handleLogout = () => {
-    // TODO: Implement logout
-    alert('Logout')
+  const handleLogout = async () => {
+    try {
+      await signOut({ 
+        redirect: true,
+        callbackUrl: '/loja'
+      })
+    } catch (error) {
+      console.error('Erro ao fazer logout:', error)
+      alert('Erro ao fazer logout. Tente novamente.')
+    }
+  }
+
+  // Show loading state
+  if (loadingData || !session?.user) {
+    return (
+      <LojaLayout>
+        <div className="max-w-7xl mx-auto px-4 py-8">
+          <div className="text-center py-12">
+            <p className="text-gray-600">Carregando...</p>
+          </div>
+        </div>
+      </LojaLayout>
+    )
+  }
+
+  // Use session data as fallback
+  const userData = usuario || {
+    name: (session?.user as any)?.nome || session?.user?.email?.split('@')[0] || 'Usuário',
+    email: session?.user?.email || '',
+    telefone: '',
+    cpf: '',
+    endereco: {
+      rua: '',
+      numero: '',
+      complemento: '',
+      bairro: '',
+      cidade: '',
+      estado: '',
+      cep: ''
+    }
   }
 
   return (
@@ -163,10 +314,14 @@ export default function MinhaContaPage() {
                 {/* User Info */}
                 <div className="text-center pb-4 border-b border-gray-200 mb-4">
                   <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-3">
-                    <User className="w-10 h-10 text-white" />
+                    {userData.image ? (
+                      <img src={userData.image} alt={userData.name} className="w-full h-full rounded-full object-cover" />
+                    ) : (
+                      <User className="w-10 h-10 text-white" />
+                    )}
                   </div>
-                  <h3 className="font-semibold text-gray-900">{usuario.nome}</h3>
-                  <p className="text-sm text-gray-600">{usuario.email}</p>
+                  <h3 className="font-semibold text-gray-900">{userData.name}</h3>
+                  <p className="text-sm text-gray-600">{userData.email}</p>
                 </div>
 
                 {/* Navigation */}
@@ -216,13 +371,15 @@ export default function MinhaContaPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <Input
                         label="Nome Completo"
-                        defaultValue={usuario.nome}
+                        value={formData.name}
+                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                         leftIcon={<User className="w-5 h-5" />}
                       />
                       <Input
                         label="Email"
                         type="email"
-                        defaultValue={usuario.email}
+                        value={formData.email}
+                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                         leftIcon={<Mail className="w-5 h-5" />}
                       />
                     </div>
@@ -230,13 +387,19 @@ export default function MinhaContaPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <Input
                         label="CPF"
-                        defaultValue={usuario.cpf}
+                        defaultValue={userData.cpf || ''}
                         disabled
                       />
                       <Input
                         label="Telefone"
-                        defaultValue={usuario.telefone}
+                        value={formData.telefone}
+                        onChange={(e) => {
+                          const formatted = formatPhoneInput(e.target.value)
+                          setFormData({ ...formData, telefone: formatted })
+                        }}
+                        placeholder="(11)99985-1234"
                         leftIcon={<Phone className="w-5 h-5" />}
+                        maxLength={14} // (XX)XXXXX-XXXX = 14 caracteres
                       />
                     </div>
 
@@ -320,41 +483,48 @@ export default function MinhaContaPage() {
                       <div className="col-span-2">
                         <Input
                           label="CEP"
-                          defaultValue={usuario.endereco.cep}
+                          value={formData.endereco.cep}
+                          onChange={(e) => setFormData({ ...formData, endereco: { ...formData.endereco, cep: e.target.value } })}
                         />
                       </div>
                     </div>
 
                     <Input
                       label="Rua"
-                      defaultValue={usuario.endereco.rua}
+                      value={formData.endereco.rua}
+                      onChange={(e) => setFormData({ ...formData, endereco: { ...formData.endereco, rua: e.target.value } })}
                       leftIcon={<MapPin className="w-5 h-5" />}
                     />
 
                     <div className="grid grid-cols-2 gap-4">
                       <Input
                         label="Número"
-                        defaultValue={usuario.endereco.numero}
+                        value={formData.endereco.numero}
+                        onChange={(e) => setFormData({ ...formData, endereco: { ...formData.endereco, numero: e.target.value } })}
                       />
                       <Input
                         label="Complemento"
-                        defaultValue={usuario.endereco.complemento}
+                        value={formData.endereco.complemento}
+                        onChange={(e) => setFormData({ ...formData, endereco: { ...formData.endereco, complemento: e.target.value } })}
                       />
                     </div>
 
                     <Input
                       label="Bairro"
-                      defaultValue={usuario.endereco.bairro}
+                      value={formData.endereco.bairro}
+                      onChange={(e) => setFormData({ ...formData, endereco: { ...formData.endereco, bairro: e.target.value } })}
                     />
 
                     <div className="grid grid-cols-2 gap-4">
                       <Input
                         label="Cidade"
-                        defaultValue={usuario.endereco.cidade}
+                        value={formData.endereco.cidade}
+                        onChange={(e) => setFormData({ ...formData, endereco: { ...formData.endereco, cidade: e.target.value } })}
                       />
                       <Input
                         label="Estado"
-                        defaultValue={usuario.endereco.estado}
+                        value={formData.endereco.estado}
+                        onChange={(e) => setFormData({ ...formData, endereco: { ...formData.endereco, estado: e.target.value } })}
                         maxLength={2}
                       />
                     </div>

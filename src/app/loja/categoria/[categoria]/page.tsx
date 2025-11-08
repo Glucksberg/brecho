@@ -139,7 +139,17 @@ export default function CategoriaPage({ params }: { params: { categoria: string 
                         <button
                           onClick={(e) => {
                             e.preventDefault()
-                            toggleFavorite(produto.id)
+                            toggleFavorite({
+                              id: produto.id,
+                              nome: produto.nome,
+                              preco: produto.preco,
+                              imagemPrincipal: produto.imagemPrincipal,
+                              tamanho: produto.tamanho,
+                              cor: produto.cor,
+                              marca: produto.marca,
+                              categoria: produto.categoria,
+                              descricao: produto.descricao,
+                            })
                           }}
                           className="absolute top-3 right-3 w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-md hover:bg-red-50 transition-colors"
                         >

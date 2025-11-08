@@ -1,6 +1,7 @@
 import { NextAuthOptions, getServerSession as nextAuthGetServerSession } from 'next-auth'
 import { PrismaAdapter } from '@next-auth/prisma-adapter'
 import CredentialsProvider from 'next-auth/providers/credentials'
+import GoogleProvider from 'next-auth/providers/google'
 import { prisma } from './prisma'
 const bcrypt = require('bcryptjs')
 import { logger } from './logger'
@@ -73,18 +74,100 @@ export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
 
   providers: [
+    GoogleProvider({
+      clientId: process.env.GOOGLE_CLIENT_ID || '',
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
+      allowDangerousEmailAccountLinking: true, // Permite vincular contas com mesmo email
+    }),
     CredentialsProvider({
       name: 'Credentials',
       credentials: {
         username: { label: 'Usuário', type: 'text' },
+        email: { label: 'Email', type: 'email' },
         password: { label: 'Senha', type: 'password' }
       },
       async authorize(credentials) {
         try {
+          /**
+           * SEPARAÇÃO DE AUTENTICAÇÃO:
+           * 
+           * 1. CLIENTES (gerenciados localmente):
+           *    - Usam email + password
+           *    - Criados via /loja/login (cadastro) ou Google OAuth
+           *    - Senha armazenada localmente com bcrypt
+           *    - NUNCA passam pelo Portal de Licenças
+           * 
+           * 2. DONO/VENDEDOR (gerenciados pelo Portal de Licenças):
+           *    - Usam username + password
+           *    - Credenciais fornecidas pelo Portal de Licenças
+           *    - Validação sempre via Portal de Licenças
+           *    - NUNCA têm senha armazenada localmente
+           */
+
+          // ============================================
+          // LOGIN DE CLIENTE (email + password)
+          // ============================================
+          if (credentials?.email && credentials?.password) {
+            // Verificar se não tem username (garantir que é cliente)
+            if (credentials?.username) {
+              throw new Error('Use email para login de cliente ou username para login administrativo')
+            }
+
+            const user = await prisma.user.findUnique({
+              where: { email: credentials.email }
+            })
+
+            if (!user || !user.password) {
+              throw new Error('Email ou senha inválidos')
+            }
+
+            // Clientes não devem ter username (são gerenciados localmente)
+            if (user.username) {
+              // Se tem username, é conta administrativa - não pode fazer login com email
+              throw new Error('Esta conta é administrativa. Use o login administrativo com username.')
+            }
+
+            // Verificar senha
+            const isValid = await bcrypt.compare(credentials.password, user.password)
+            if (!isValid) {
+              throw new Error('Email ou senha inválidos')
+            }
+
+            if (!user.ativo) {
+              throw new Error('Conta desativada')
+            }
+
+            // Garantir que é CLIENTE
+            if (user.role !== UserRole.CLIENTE) {
+              throw new Error('Use o login administrativo para esta conta')
+            }
+
+            logger.info('Cliente login success', { email: credentials.email })
+            return {
+              id: user.id,
+              name: user.name,
+              email: user.email,
+              role: user.role,
+              brechoId: user.brechoId || undefined,
+              fornecedoraId: user.fornecedoraId || undefined,
+              avatar: user.image || undefined,
+              permissoes: user.permissoes || []
+            } as any
+          }
+
+          // ============================================
+          // LOGIN DE DONO/VENDEDOR (username + password)
+          // ============================================
+          // Login via Portal de Licenças (username/password)
           console.log('[AUTH] Starting authorization', { username: credentials?.username, hasPassword: !!credentials?.password })
           if (!credentials?.username || !credentials?.password) {
             console.log('[AUTH] Missing credentials')
             throw new Error('Usuário e senha são obrigatórios')
+          }
+
+          // Se tem email junto com username, rejeitar (confusão)
+          if (credentials?.email) {
+            throw new Error('Use apenas username para login administrativo ou apenas email para login de cliente')
           }
 
           // 1) Tentar autenticar via Portal de Licenças
@@ -245,20 +328,91 @@ export const authOptions: NextAuthOptions = {
   },
 
   callbacks: {
-    async jwt({ token, user, trigger, session }) {
+    async signIn({ user, account, profile }) {
+      // Se login via Google OAuth
+      if (account?.provider === 'google' && user.email) {
+        try {
+          // Verificar se usuário já existe
+          const existingUser = await prisma.user.findUnique({
+            where: { email: user.email }
+          })
+
+          // Se não existe, criar como CLIENTE
+          if (!existingUser) {
+            // Buscar primeiro brechó disponível (ou criar um padrão)
+            let brecho = await prisma.brecho.findFirst()
+            
+            if (!brecho) {
+              // Criar brechó padrão se não existir
+              brecho = await prisma.brecho.create({
+                data: {
+                  nome: 'Retrô Carólis',
+                  slug: 'retrocarolis',
+                  ativo: true,
+                  email: 'contato@retrocarolis.com'
+                }
+              })
+            }
+
+            // Criar usuário CLIENTE
+            await prisma.user.create({
+              data: {
+                email: user.email,
+                name: user.name || user.email.split('@')[0],
+                image: user.image,
+                role: UserRole.CLIENTE,
+                brechoId: null, // Cliente não vinculado a brechó específico inicialmente
+                ativo: true,
+                comissao: 0,
+                metaMensal: 0,
+                permissoes: []
+              }
+            })
+
+            logger.info('Google OAuth user created', { email: user.email })
+          }
+        } catch (error: any) {
+          logger.error('Error creating Google OAuth user', { error: error?.message })
+          // Não bloquear login se houver erro
+        }
+      }
+
+      return true
+    },
+
+    async jwt({ token, user, account, trigger, session }) {
       // Initial sign in
       if (user) {
-        token.id = user.id
-        token.role = (user as any).role
-        token.brechoId = (user as any).brechoId
-        token.fornecedoraId = (user as any).fornecedoraId
-        token.avatar = (user as any).avatar
-        token.permissoes = (user as any).permissoes || []
-        // @ts-ignore
-        if ((user as any).username) {
-          // @ts-ignore
-          token.username = (user as any).username
+        // Buscar dados completos do usuário no banco
+        const dbUser = await prisma.user.findUnique({
+          where: { email: user.email || '' }
+        })
+
+        if (dbUser) {
+          token.id = dbUser.id
+          token.role = dbUser.role
+          token.brechoId = dbUser.brechoId || undefined
+          token.fornecedoraId = dbUser.fornecedoraId || undefined
+          token.avatar = dbUser.image || user.image || undefined
+          token.permissoes = dbUser.permissoes || []
+          
+          if (dbUser.username) {
+            token.username = dbUser.username
+          }
+        } else {
+          // Fallback para dados do user object
+          token.id = user.id
+          token.role = (user as any).role || UserRole.CLIENTE
+          token.brechoId = (user as any).brechoId
+          token.fornecedoraId = (user as any).fornecedoraId
+          token.avatar = (user as any).avatar || user.image
+          token.permissoes = (user as any).permissoes || []
+          
+          if ((user as any).username) {
+            token.username = (user as any).username
+          }
         }
+
         // Transportar dados do portal de licenças quando presentes
         // @ts-ignore
         if ((user as any).portalToken) {

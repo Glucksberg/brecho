@@ -1,10 +1,12 @@
 'use client'
 
 import Link from 'next/link'
-import { ShoppingCart, User, Search, Heart } from 'lucide-react'
-import { Input } from '@/components/ui'
+import { ShoppingCart, User, Search, Heart, LogOut } from 'lucide-react'
+import { Input, Button } from '@/components/ui'
 import { useCart } from '@/contexts/CartContext'
 import { useFavorites } from '@/contexts/FavoritesContext'
+import { useSession, signOut } from 'next-auth/react'
+import { useRouter } from 'next/navigation'
 
 interface LojaLayoutProps {
   children: React.ReactNode
@@ -13,6 +15,18 @@ interface LojaLayoutProps {
 export function LojaLayout({ children }: LojaLayoutProps) {
   const { cartCount } = useCart()
   const { favoritesCount } = useFavorites()
+  const { data: session } = useSession()
+  const router = useRouter()
+
+  const handleLogout = async () => {
+    await signOut({ 
+      redirect: false,
+      callbackUrl: '/loja'
+    })
+    router.push('/loja')
+    router.refresh()
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Header */}
@@ -69,9 +83,44 @@ export function LojaLayout({ children }: LojaLayoutProps) {
                   </span>
                 )}
               </Link>
-              <Link href="/loja/conta" className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                <User className="w-6 h-6 text-gray-600" />
-              </Link>
+              {session?.user ? (
+                <div className="relative group">
+                  <Link href="/loja/conta" className="p-2 hover:bg-gray-100 rounded-lg transition-colors flex items-center gap-2">
+                    {(session.user as any)?.avatar ? (
+                      <img 
+                        src={(session.user as any).avatar} 
+                        alt={(session.user as any)?.nome || session.user.email || 'Usuário'} 
+                        className="w-6 h-6 rounded-full"
+                      />
+                    ) : (
+                      <User className="w-6 h-6 text-gray-600" />
+                    )}
+                  </Link>
+                  <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                    <div className="p-3 border-b border-gray-200">
+                      <p className="font-semibold text-sm text-gray-900">{(session.user as any)?.nome || session.user.email}</p>
+                      <p className="text-xs text-gray-600">{session.user.email}</p>
+                    </div>
+                    <Link 
+                      href="/loja/conta" 
+                      className="block px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                    >
+                      Minha Conta
+                    </Link>
+                    <button
+                      onClick={handleLogout}
+                      className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      Sair
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <Link href="/loja/login" className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                  <User className="w-6 h-6 text-gray-600" />
+                </Link>
+              )}
             </div>
           </div>
 

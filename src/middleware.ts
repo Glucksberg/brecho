@@ -17,6 +17,20 @@ const publicPaths = [
   '/login',
   '/cadastro',
   '/loja',
+  '/loja/login',
+  '/loja/cadastro',
+  '/loja/categoria',
+  '/loja/produto',
+  '/loja/novidades',
+  '/loja/rastrear',
+  '/loja/sobre',
+  '/loja/como-funciona',
+  '/loja/blog',
+  '/loja/contato',
+  '/loja/faq',
+  '/loja/envio',
+  '/loja/trocas',
+  '/loja/pagamento',
   '/produto',
   '/carrinho',
   '/checkout',
@@ -48,8 +62,8 @@ const fornecedoraPaths = [
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // Allow public paths
-  if (publicPaths.some(path => pathname.startsWith(path))) {
+  // Allow public paths (check if pathname starts with any public path)
+  if (publicPaths.some(path => pathname === path || pathname.startsWith(path + '/'))) {
     return NextResponse.next()
   }
 
@@ -75,10 +89,21 @@ export async function middleware(request: NextRequest) {
   const onboardingAllowed = [
     '/onboarding',
     '/api/onboarding',
+    '/loja/conta', // CLIENTE pode acessar sua conta sem brechoId
+    '/loja/favoritos', // CLIENTE pode acessar favoritos sem brechoId
+    '/api/user', // APIs de usuário CLIENTE não requerem brechoId
   ]
   const hasBrecho = !!(token as any).brechoId
   const isOnboardingPath = onboardingAllowed.some(path => pathname.startsWith(path))
+  const isCliente = (token as any).role === 'CLIENTE'
+  
+  // CLIENTE sem brechoId pode acessar rotas da loja, mas não outras áreas
   if (!hasBrecho && !isOnboardingPath) {
+    // Se for CLIENTE tentando acessar rotas da loja, permitir
+    if (isCliente && pathname.startsWith('/loja')) {
+      return NextResponse.next()
+    }
+    // Caso contrário, redirecionar para onboarding
     return NextResponse.redirect(new URL('/onboarding', request.url))
   }
 
