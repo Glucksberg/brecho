@@ -7,6 +7,14 @@ import { logger } from './logger'
 import type { SessionUser } from '@/types'
 import { UserRole } from '@prisma/client'
 
+function slugify(input: string): string {
+  return (input || '')
+    .toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)+/g, '')
+}
+
 /**
  * Login via Portal de Licenças (CloudFarm)
  * Documentação recebida (2025-11-08)
@@ -91,9 +99,90 @@ export const authOptions: NextAuthOptions = {
               const email = portal.data?.user_info?.email || undefined
               const portalToken = portal.data?.session?.token as string | undefined
               const portalSessionId = portal.data?.session?.session_id as string | undefined
+              const username = credentials.username
 
               console.log('[AUTH] License portal success', { username: credentials.username })
               logger.info('License portal auth success', { username: credentials.username })
+
+              // Auto-provisioning: garantir User local e Brecho associados na primeira vez
+              let provisionedBrechoId: string | undefined
+              try {
+                const existingUser = await prisma.user.findUnique({
+                  where: { username },
+                  include: { brecho: true }
+                })
+
+                if (existingUser?.brechoId) {
+                  provisionedBrechoId = existingUser.brechoId
+                } else {
+                  // Criar brechó mínimo e vincular usuário DONO
+                  const baseName = displayName || username
+                  let baseSlug = slugify(baseName) || slugify(username)
+                  if (!baseSlug) baseSlug = `brecho-${Date.now()}`
+                  let slug = baseSlug
+                  let i = 1
+                  // garantir slug único
+                  // eslint-disable-next-line no-constant-condition
+                  while (true) {
+                    const found = await prisma.brecho.findUnique({ where: { slug } })
+                    if (!found) break
+                    slug = `${baseSlug}-${i++}`
+                  }
+
+                  const result = await prisma.$transaction(async (tx) => {
+                    const brecho = await tx.brecho.create({
+                      data: {
+                        nome: baseName,
+                        slug,
+                        ativo: true,
+                        email: email
+                      }
+                    })
+
+                    // e-mail único para usuário local
+                    let userEmail = email || `${username}@${slug}.local`
+                    let candidate = userEmail
+                    let n = 1
+                    // eslint-disable-next-line no-constant-condition
+                    while (true) {
+                      const foundUser = await tx.user.findUnique({ where: { email: candidate } })
+                      if (!foundUser) break
+                      const [local, ...domainParts] = userEmail.split('@')
+                      const domain = domainParts.join('@') || 'local.local'
+                      candidate = `${local}+${n++}@${domain}`
+                    }
+                    userEmail = candidate
+
+                    await tx.user.upsert({
+                      where: { username },
+                      update: {
+                        name: baseName,
+                        email: userEmail,
+                        role: UserRole.DONO,
+                        brechoId: brecho.id,
+                        ativo: true
+                      },
+                      create: {
+                        name: baseName,
+                        username,
+                        email: userEmail,
+                        role: UserRole.DONO,
+                        brechoId: brecho.id,
+                        ativo: true,
+                        comissao: 0,
+                        metaMensal: 0,
+                        permissoes: []
+                      }
+                    })
+
+                    return { brechoId: brecho.id }
+                  })
+
+                  provisionedBrechoId = result.brechoId
+                }
+              } catch (provErr: any) {
+                logger.error('Auto-provisioning failed', { error: provErr?.message })
+              }
 
               return {
                 id: `portal:${credentials.username}`,
@@ -101,7 +190,7 @@ export const authOptions: NextAuthOptions = {
                 username: credentials.username,
                 email,
                 role: UserRole.DONO, // Mapeando MASTER -> DONO local
-                brechoId: undefined,
+                brechoId: provisionedBrechoId, // se provisionado, já vai habilitar dashboard
                 fornecedoraId: undefined,
                 avatar: undefined,
                 permissoes: [],
