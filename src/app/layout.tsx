@@ -9,7 +9,10 @@ export const metadata: Metadata = {
   title: 'Retrô Carólis - Sistema de Gestão para Brechós',
   description: 'Sistema completo de gestão para brechós com e-commerce integrado',
   icons: {
-    icon: '/favicon.ico',
+    icon: [
+      { url: '/favicon.svg', type: 'image/svg+xml' },
+      { url: '/favicon.ico', sizes: '32x32', type: 'image/x-icon' },
+    ],
   },
 }
 
